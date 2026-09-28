@@ -1,0 +1,40 @@
+garment_type,slot,clo,source
+underwear,underwear,0.04,ASHRAE 55 garment table
+tank_top,base_top,0.12,ASHRAE 55 (sleeveless scoop-neck blouse)
+t_shirt,base_top,0.08,ASHRAE 55
+short_sleeve_shirt,base_top,0.19,ASHRAE 55 (short-sleeve dress shirt)
+long_sleeve_shirt,base_top,0.25,ASHRAE 55 (long-sleeve dress shirt)
+flannel_shirt,base_top,0.34,ASHRAE 55 (long-sleeve flannel shirt)
+thermal_top,base_top,0.20,estimate (long underwear top; ISO 9920 range)
+sweater_thin,mid_top,0.25,ASHRAE 55 (long-sleeve sweater thin)
+sweater_thick,mid_top,0.36,ASHRAE 55 (long-sleeve sweater thick)
+cardigan,mid_top,0.25,ASHRAE 55 (long-sleeve sweater thin)
+hoodie,mid_top,0.34,ASHRAE 55 (long-sleeve sweatshirt)
+sweater_vest,mid_top,0.22,ASHRAE 55 (sleeveless vest thick)
+fleece_jacket,mid_top,0.35,estimate (similar to thick sweater)
+blazer,outer,0.36,ASHRAE 55 (single-breasted jacket thin)
+denim_jacket,outer,0.36,estimate (single-breasted jacket thin)
+rain_shell,outer,0.20,estimate (unlined nylon shell)
+wool_coat,outer,0.60,estimate (ISO 9920 overcoat range)
+puffer_jacket,outer,0.60,estimate (insulated jacket)
+down_parka,outer,0.80,estimate (long insulated parka)
+shorts,bottom,0.08,ASHRAE 55 (walking shorts)
+trousers_thin,bottom,0.15,ASHRAE 55 (straight trousers thin)
+trousers_thick,bottom,0.24,ASHRAE 55 (straight trousers thick)
+jeans,bottom,0.24,estimate (thick trousers)
+sweatpants,bottom,0.28,ASHRAE 55
+skirt_thin,bottom,0.14,ASHRAE 55 (skirt thin)
+skirt_thick,bottom,0.23,ASHRAE 55 (skirt thick)
+long_skirt,bottom,0.25,estimate (ankle-length thick skirt)
+dress_thin,one_piece,0.33,ASHRAE 55 (long-sleeve shirtdress thin)
+dress_thick,one_piece,0.47,ASHRAE 55 (long-sleeve shirtdress thick)
+tights,legwear,0.02,ASHRAE 55 (pantyhose)
+fleece_tights,legwear,0.10,estimate
+thermal_leggings,legwear,0.15,estimate (long underwear bottoms)
+socks,socks,0.03,ASHRAE 55 (calf-length socks)
+wool_socks,socks,0.06,ASHRAE 55 (knee socks thick)
+sneakers,shoes,0.02,ASHRAE 55 (shoes)
+boots,shoes,0.10,ASHRAE 55 (boots)
+beanie,head,0.05,estimate
+gloves,hands,0.05,estimate
+scarf,neck,0.05,estimate

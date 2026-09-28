@@ -1,0 +1,15 @@
+[project]
+name = "layer-lab"
+version = "0.1.0"
+description = "Layer Lab: a tool-calling agent that picks what to wear from your closet for the hours you're actually outside"
+requires-python = ">=3.10"
+dependencies = [
+    "fastapi>=0.109.0",
+    "uvicorn>=0.27.0",
+    "litellm>=1.50",
+    "google-cloud-aiplatform>=1.40.0",
+    "requests>=2.31",
+    "cachetools>=5.3",
+    "python-multipart>=0.0.9",
+    "pillow>=10.0",
+]

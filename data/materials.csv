@@ -1,0 +1,16 @@
+material,wet_retention,wind_resistance,notes
+cotton,0.3,low,Absorbs water and collapses; cold when wet
+denim,0.3,low,Cotton twill; same wet behavior as cotton
+linen,0.3,low,
+viscose,0.3,low,Also sold as rayon
+silk,0.4,low,
+wool,0.8,low,Keeps most of its warmth when damp
+merino,0.8,low,
+cashmere,0.7,low,
+acrylic,0.6,low,
+polyester,0.7,medium,
+fleece,0.8,low,Polyester fleece; warm when wet but wind passes through
+nylon,0.7,high,Common shell fabric
+down,0.3,medium,Loses loft when soaked unless the shell keeps it dry
+leather,0.7,high,
+elastane,0.6,low,Also sold as spandex; usually a small share
