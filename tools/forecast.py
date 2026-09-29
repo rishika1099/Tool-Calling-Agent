@@ -85,6 +85,31 @@ def hourly_for_day(location: str, day: str) -> tuple[dict, date, list[dict]]:
     return place, wanted, rows
 
 
+@cached(TTLCache(maxsize=64, ttl=10 * 60))
+def current_conditions(location: str = "New York") -> dict:
+    """Weather right now, for the page's live sky (not a model tool). Raises on failure."""
+    place = _geocode(location)
+    now = requests.get(
+        FORECAST_URL,
+        params={
+            "latitude": place["latitude"],
+            "longitude": place["longitude"],
+            "current": "temperature_2m,apparent_temperature,precipitation,rain,snowfall,wind_speed_10m",
+            "wind_speed_unit": "ms",
+            "timezone": "auto",
+        },
+        timeout=10,
+    ).json()["current"]
+    return {
+        "location": place["name"],
+        "temp_f": to_f(now["temperature_2m"]),
+        "feels_like_f": to_f(now["apparent_temperature"]),
+        "wind_mph": to_mph(now["wind_speed_10m"]),
+        "rain": now["rain"] > 0 or (now["precipitation"] > 0 and now["snowfall"] == 0),
+        "snow": now["snowfall"] > 0,
+    }
+
+
 def to_f(c: float) -> int:
     return round(c * 9 / 5 + 32)
 

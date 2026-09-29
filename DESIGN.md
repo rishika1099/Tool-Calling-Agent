@@ -1,20 +1,20 @@
 # Layer Lab: Design Notes
 
 ## Direction
-Editorial and calm, like a well-made wool coat: warm neutrals, one rust accent, lots of space,
-a serif for headings. The data (clo bars, timeline) should feel like part of the design, not a dashboard.
+A live sky behind frosted-glass panels. The weather is the backdrop: clear and blue on warm days,
+paler when it's cold, heavy slate clouds with rain or snow falling when the forecast says so, and a
+night sky in dark mode. On top: editorial type (Fraunces, variable weight) and a warm orange accent
+that stands out against the blue.
 
 ## Tokens (in `static/style.css`)
-| Token | Light | Dark | Use |
+| Token | Day | Night | Use |
 |---|---|---|---|
-| `--bg` | `#f4f0e8` oat | `#151412` | page |
-| `--surface` | `#fffdf9` | `#1e1c1a` | cards |
-| `--ink` | `#1e1c19` | `#ede8e0` | text |
-| `--accent` | `#b5543a` rust | `#d9774f` | send button, tool names, selection |
-| `--cold` / `--warm` | `#3f6c8c` / `#c98b2b` | `#7fa7c6` / `#e0a94f` | warmth bars, weather |
+| `--ink` | `#0e1a2b` | `#eef2f8` | text |
+| `--glass` / `--glass-strong` | white 70% / 88% | navy 60% / 80% | panels, inputs |
+| `--accent` | `#e0572f` | `#ff8a5c` | send button, focus, numbering |
+| `--cold` / `--cool` / `--warm` / `--hot` | blue to orange | lighter versions | thermal scale for warmth |
 
-Fonts: **Fraunces** (headings) + **Inter** (text), from Google Fonts.
-Dark mode follows the system setting and can be forced with `data-theme="dark"` on `<html>`.
+Fonts: **Fraunces** (display, variable `wght`/`opsz`/`SOFT`), **Inter** (text), **Geist Mono** (numbers, tool names).
 
 ## Inspiration and what to take from each
 | Source | Use it for |
@@ -28,19 +28,27 @@ Dark mode follows the system setting and can be forced with `data-theme="dark"` 
 | [mockupworld.co](https://mockupworld.co) | Device mockups for README screenshots |
 | [latent-spaces/brag](https://github.com/latent-spaces/brag) | A short launch video of the finished app for the README (Claude Code skill; needs Node 22+ and FFmpeg) |
 
-## Motion (anime.js)
-anime.js v4 is loaded from cdnjs in `index.html`. The helpers in `static/app.js` are `enter()`
-(fade and rise with a stagger), `growBars()` (warmth bars grow from the left) and `countUp()` (clo numbers).
-They run only when content changes, and not at all with reduced motion or if the CDN fails.
-Currently animated: chat messages and tool calls, the day timeline, the outfit pieces and clo values, the closet on first load.
+## Motion and effects
+anime.js v4 (cdnjs) drives everything except the sky. Effects are plain-JS versions of components from
+[reactbits.dev](https://reactbits.dev) and [originkit.dev](https://www.originkit.dev), which are React
+libraries; we have no build step, so we rebuild instead of installing.
 
-## Component references (ideas, not code)
-[reactbits.dev](https://reactbits.dev) and [originkit.dev](https://www.originkit.dev) are React/Framer component
-libraries. Our app is plain HTML served by Python with no build step, so we don't install them; we pick an
-effect we like and rebuild it with anime.js and CSS. Good candidates:
-- a split-text reveal for the intro heading
-- a soft animated gradient behind the header that follows the weather (cold / rain / mild)
-- a subtle spotlight or tilt on closet cards on hover
+| Effect | Where | Based on |
+|---|---|---|
+| Live cloud sky, weather-driven, pointer wind and parallax | `static/sky.js` | Originkit **Cloud Sky** (its WebGL shader, ported unchanged) |
+| Rain and snow particles | `static/sky.js` | our own, on a 2D canvas over the clouds |
+| Heading letters get heavier near the pointer | hero | reactbits **Variable Proximity** |
+| Rotating phrase ("walk to class", "first snow"...) | hero | reactbits **Rotating Text** |
+| Blur-in answer text, word by word | chat | reactbits **Blur Text** |
+| Outfit suggestions that expand on focus | "Your layers" | reactbits **FlexCarousel** (`liquid`, `rise`, `focusOnClick`, `captions`) |
+| Spotlight and 3D tilt on cards | panels, prompts, closet | reactbits **Spotlight Card**, **Tilted Card** |
+| Sparks on send | composer | reactbits **Click Spark** |
+| Sliding thumb with a spring | cold-sensitivity control | |
+| Layers stacking inside out, thermometers filling, numbers counting up | "Your layers" | |
+| Day ribbon drawing left to right | "Your day" | |
+
+Everything respects `prefers-reduced-motion` (the sky draws one still frame). The sky falls back to a
+gradient without WebGL and renders at 60% resolution to stay light.
 
 ## Diagrams
 `docs/architecture.svg` follows [diagram-design](https://github.com/cathrynlavery/diagram-design)'s architecture type,

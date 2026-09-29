@@ -13,6 +13,7 @@ from pydantic import BaseModel
 from session import Session
 from tools import TOOLS, run_tool
 from tools.catalog import clo, slot
+from tools.forecast import current_conditions
 
 # --- Config ---
 
@@ -142,6 +143,15 @@ def chat(request: ChatRequest):
         response, tool_calls = f"Model call failed: {type(e).__name__}: {first_line}", []
 
     return ChatResponse(response=response, session_id=session_id, tool_calls=tool_calls)
+
+
+@app.get("/conditions")
+def conditions(location: str = "New York"):
+    """Current weather for the page background. Failures just mean a calm sky."""
+    try:
+        return current_conditions(location)
+    except Exception:
+        raise HTTPException(503, "Weather unavailable.")
 
 
 @app.post("/clear")

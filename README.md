@@ -68,6 +68,10 @@ Layer Lab gives clothing suggestions, not medical or safety advice.
 2. `gcloud auth application-default login`
 3. `uv run app.py`, then open http://localhost:8000
 
+## Credits
+
+The animated sky ports the WebGL shader from [Originkit](https://www.originkit.dev)'s Cloud Sky component. Several UI effects are plain-JS versions of [React Bits](https://reactbits.dev) components (see DESIGN.md). Motion by [anime.js](https://animejs.com).
+
 ## Tests
 
 - `uv run pytest`: offline checks of the warmth model (including the ISO 7730 PMV reference values) and the outfit builder.
@@ -90,7 +94,7 @@ app.py              harness (tool-calling loop), sessions, /chat /upload /wardro
 session.py          per-session state: messages, closet, cold sensitivity, last plan, photos
 tools/              one module per tool area; each exports TOOLS and TOOL_MAP
 data/               garment clo values, fiber behavior, demo closet
-static/             frontend (index.html, style.css, app.js; animations with anime.js)
+static/             frontend: index.html, style.css, app.js (anime.js), sky.js (live weather sky)
 tests/, evals/      offline unit tests; tool-selection checks against the real model
 docs/               architecture diagram
 PROPOSAL.md         plan, features and who owns what
