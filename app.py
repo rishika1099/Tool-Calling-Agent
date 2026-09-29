@@ -10,14 +10,16 @@ from fastapi.responses import FileResponse, Response
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
-from session import Session
+from session import BORROW, ESSENTIALS, Session, demo_wardrobe
+from settings import MODEL, VERTEX_LOCATION
 from tools import TOOLS, run_tool
-from tools.catalog import clo, slot
+from tools.catalog import GARMENTS, MATERIALS, clo, slot
+from tools.photos import PhotoError, open_image
+from tools.wardrobe import FITS, PATTERNS, RAIN, GarmentScanError, add_item, analyze_garment
 from tools.forecast import current_conditions
 
 # --- Config ---
 
-MODEL = "vertex_ai/gemini-3.5-flash-lite"
 MAX_TOOL_ROUNDS = 8
 MAX_UPLOAD_BYTES = 8 * 1024 * 1024
 
@@ -58,7 +60,7 @@ def run_agent(session: Session) -> tuple[str, list[dict]]:
     for _ in range(MAX_TOOL_ROUNDS):
         reply = litellm.completion(
             model=MODEL,
-            vertex_location="global",
+            vertex_location=VERTEX_LOCATION,
             messages=messages,
             tools=TOOLS,
         ).choices[0].message
@@ -120,6 +122,31 @@ class StatusRequest(BaseModel):
     status: str
 
 
+class ScanRequest(BaseModel):
+    session_id: str
+    photo_id: str
+    label_photo_id: str | None = None
+
+
+class ItemRequest(BaseModel):
+    session_id: str
+    item: dict
+
+
+class PhotoRequest(BaseModel):
+    session_id: str
+    image_id: str | None = None
+
+
+class StartRequest(BaseModel):
+    session_id: str
+    mode: str  # "own" (start empty) or "demo"
+
+
+class SessionRequest(BaseModel):
+    session_id: str
+
+
 class ProfileRequest(BaseModel):
     session_id: str
     cold_sensitivity: str
@@ -171,7 +198,92 @@ def wardrobe(session_id: str | None = None):
         "cold_sensitivity": session.cold_sensitivity,
         "last_plan": session.last_plan,
         "last_outfit": session.last_outfit,
+        "person_photo_id": session.person_photo_id,
+        "setup_done": session.setup_done,
     }
+
+
+@app.post("/wardrobe/start")
+def wardrobe_start(request: StartRequest):
+    """Begin with an empty closet to build your own, or with the demo closet."""
+    if request.mode not in ("own", "demo"):
+        raise HTTPException(400, "mode must be 'own' or 'demo'.")
+    _, session = get_session(request.session_id)
+    session.wardrobe = {} if request.mode == "own" else demo_wardrobe()
+    session.last_outfit = None
+    session.setup_done = request.mode == "demo"
+    return {"mode": request.mode, "items": len(session.wardrobe)}
+
+
+@app.post("/wardrobe/finish")
+def wardrobe_finish(request: SessionRequest):
+    """Finish closet setup. Borrow demo basics for any essential the user hasn't added."""
+    _, session = get_session(request.session_id)
+    demo = demo_wardrobe()
+    borrowed = []
+    for need, slots in ESSENTIALS.items():
+        if not any(slot(item) in slots for item in session.wardrobe.values()):
+            item = {**demo[BORROW[need]], "borrowed": True}
+            session.wardrobe[item["id"]] = item
+            borrowed.append(item["name"])
+    session.setup_done = True
+    return {"borrowed": borrowed}
+
+
+@app.get("/catalog")
+def catalog():
+    """Choices for the Add clothes form."""
+    def label(garment_type):
+        base, _, weight = garment_type.rpartition("_") if garment_type.endswith(("_thin", "_thick")) else (garment_type, "", "")
+        text = base.replace("_", " ").capitalize()
+        return f"{text} ({weight})" if weight else text
+    return {
+        "garments": [{"type": t, "label": label(t), "slot": row["slot"], "clo": float(row["clo"])} for t, row in GARMENTS.items()],
+        "materials": list(MATERIALS),
+        "fits": FITS, "patterns": PATTERNS, "rain": RAIN,
+    }
+
+
+@app.post("/wardrobe/scan")
+def wardrobe_scan(request: ScanRequest):
+    """Suggest item fields from a photo (Gemini vision). Saves nothing; the form confirms."""
+    _, session = get_session(request.session_id)
+    try:
+        return analyze_garment(session, request.photo_id, request.label_photo_id)
+    except (GarmentScanError, PhotoError) as e:
+        raise HTTPException(422, str(e))
+    except Exception as e:
+        raise HTTPException(502, f"Scanning is unavailable right now ({type(e).__name__}). Fill in the details by hand.")
+
+
+@app.post("/wardrobe/item")
+def wardrobe_add(request: ItemRequest):
+    _, session = get_session(request.session_id)
+    try:
+        item = add_item(session, request.item)
+    except (GarmentScanError, PhotoError) as e:
+        raise HTTPException(422, str(e))
+    return {**item, "slot": slot(item), "clo": clo(item)}
+
+
+@app.delete("/wardrobe/item")
+def wardrobe_remove(session_id: str, item_id: str):
+    _, session = get_session(session_id)
+    item = session.wardrobe.get(item_id)
+    if not item or not item.get("user_added"):
+        raise HTTPException(404, "Only clothes you added can be removed.")
+    del session.wardrobe[item_id]
+    return {"removed": item_id}
+
+
+@app.post("/me/photo")
+def me_photo(request: PhotoRequest):
+    """Save (or clear) the user's full-body photo for try-on."""
+    _, session = get_session(request.session_id)
+    if request.image_id and request.image_id not in session.images:
+        raise HTTPException(404, "Upload the photo first.")
+    session.person_photo_id = request.image_id
+    return {"person_photo_id": session.person_photo_id}
 
 
 @app.post("/wardrobe/status")
@@ -201,6 +313,10 @@ async def upload(session_id: str = Form(...), file: UploadFile = File(...)):
     data = await file.read()
     if len(data) > MAX_UPLOAD_BYTES:
         raise HTTPException(400, "Image is larger than 8 MB.")
+    try:
+        open_image(data)
+    except PhotoError as e:
+        raise HTTPException(400, str(e))
     session_id, session = get_session(session_id)
     image_id = f"img_{secrets.token_hex(3)}"
     session.images[image_id] = (data, file.content_type)

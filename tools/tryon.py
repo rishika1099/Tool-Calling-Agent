@@ -23,7 +23,10 @@ What to build:
 import json
 
 
-def try_on_outfit(session, person_photo_id: str, item_ids: list[str] | None = None) -> str:
+def try_on_outfit(session, person_photo_id: str | None = None, item_ids: list[str] | None = None) -> str:
+    person_photo_id = person_photo_id or session.person_photo_id
+    if not person_photo_id:
+        return json.dumps({"error": "No photo of the user yet. Ask them to add one in the 'Your photo' slot."})
     if person_photo_id not in session.images:
         return json.dumps({"error": f"No uploaded photo with id '{person_photo_id}'. Ask the user for a full-body photo."})
     return json.dumps({"error": "try_on_outfit is not built yet. Tell the user the try-on preview is coming soon."})
@@ -41,10 +44,10 @@ TOOLS = [
             "parameters": {
                 "type": "object",
                 "properties": {
-                    "person_photo_id": {"type": "string", "description": "Id of the user's full-body photo."},
+                    "person_photo_id": {"type": "string", "description": "Id of the user's full-body photo. Defaults to the one saved in 'Your photo'."},
                     "item_ids": {"type": "array", "items": {"type": "string"}, "description": "Items to show. Optional."},
                 },
-                "required": ["person_photo_id"],
+                "required": [],
             },
         },
     },

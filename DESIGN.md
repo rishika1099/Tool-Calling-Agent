@@ -35,6 +35,7 @@ libraries; we have no build step, so we rebuild instead of installing.
 
 | Effect | Where | Based on |
 |---|---|---|
+| Intro: a bedroom window onto the live sky, curtains that part, zoom through the window | `#portal` | motionsites.ai **Gateway Portal** (reimagined as a bedroom window) |
 | Live cloud sky, weather-driven, pointer wind and parallax | `static/sky.js` | Originkit **Cloud Sky** (its WebGL shader, ported unchanged) |
 | Rain and snow particles | `static/sky.js` | our own, on a 2D canvas over the clouds |
 | Heading letters get heavier near the pointer | hero | reactbits **Variable Proximity** |

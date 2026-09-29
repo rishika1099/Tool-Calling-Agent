@@ -12,6 +12,12 @@ to class at 9, sit in class until 1, wait for the bus"), and Layer Lab:
 3. picks an outfit **from your own closet** that works both outside and in a heated classroom,
    skipping anything in the laundry and warning about rain and wind.
 
+**How to use it:** the intro shows today's real sky through a bedroom window. "Build my closet" takes
+you to Step 1: drop in photos of your clothes (and their care labels); each photo is scanned by Gemini
+vision, you check the details, and the checklist shows when you have a shirt, bottoms, a coat and shoes
+(missing basics are borrowed from a demo closet). Step 2 is the chat: describe your day. Graders can
+skip straight to the chat with "or try it with a demo closet".
+
 IEOR 4570 Project 1. Team: Rishika, Shreya, Kshamaa.
 
 ![Layer Lab architecture: the browser posts to FastAPI on Cloud Run; the agent loop sends the conversation to Gemini and runs the tools it asks for, which use session state, clothing warmth tables, Open-Meteo and the National Weather Service](docs/architecture.svg)
@@ -34,7 +40,7 @@ A demo closet is loaded in every new session, so these work without uploading an
 | `set_cold_sensitivity` | Rishika | Remembers whether the user runs cold, average or warm |
 | `build_outfit` | shared | Ranks outfits from the closet against the plan (warmth, rain, wind, occasion, laundry) |
 | `list_wardrobe` / `update_wardrobe` | shared | Shows the closet; marks items worn, clean or in the laundry |
-| `scan_garment` | Shreya | Adds clothes from a photo, reading the care label for the exact fiber mix *(in progress)* |
+| `scan_garment` | Shreya | Adds clothes from a photo with Gemini vision, reading the care label for the exact fiber mix; every field is validated against fixed lists |
 | `style_check` | Kshamaa | Scores whether an outfit goes together: color, shape, pattern, occasion *(in progress)* |
 | `try_on_outfit` | bonus | Shows the user wearing the outfit (Vertex AI) *(in progress)* |
 

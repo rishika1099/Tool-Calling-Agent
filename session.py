@@ -22,8 +22,18 @@ class Session:
     images: dict[str, tuple[bytes, str]] = field(default_factory=dict)  # image id -> (bytes, mime type)
     last_plan: dict | None = None  # most recent plan_day_warmth result
     last_outfit: list[str] | None = None  # item ids of the most recent build_outfit pick
+    person_photo_id: str | None = None  # the user's full-body photo, for try-on
+    setup_done: bool = False  # finished "Build your digital closet" (or chose the demo closet)
 
     @classmethod
     def new(cls, system_prompt: str) -> "Session":
-        wardrobe = {item["id"]: {"status": "clean", "wears": 0, **item} for item in copy.deepcopy(DEMO_WARDROBE)}
-        return cls(messages=[{"role": "system", "content": system_prompt}], wardrobe=wardrobe)
+        return cls(messages=[{"role": "system", "content": system_prompt}], wardrobe=demo_wardrobe())
+
+
+def demo_wardrobe() -> dict[str, dict]:
+    return {item["id"]: {"status": "clean", "wears": 0, **item} for item in copy.deepcopy(DEMO_WARDROBE)}
+
+
+# Pieces every outfit needs; missing ones can be borrowed from the demo closet.
+ESSENTIALS = {"top": ("base_top", "one_piece"), "bottom": ("bottom", "one_piece"), "coat": ("outer",), "shoes": ("shoes",)}
+BORROW = {"top": "tee-white", "bottom": "jeans-indigo", "coat": "parka-black", "shoes": "boots-leather"}

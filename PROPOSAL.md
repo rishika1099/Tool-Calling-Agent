@@ -26,7 +26,8 @@ Due **Wed Oct 7, 11:59pm**. Team: Rishika (rishika1099), Shreya (shreyashetty2),
 | Outfit builder: warmth, rain, wind, occasion formality, laundry | done |
 | Laundry: manual toggle in chat and closet panel | done |
 | Laundry: automatic wear limits per garment type | to do (Shreya) |
-| Add clothes from photos + care labels | to do (Shreya) |
+| Add clothes from photos + care labels (`scan_garment`, Gemini vision) | done; Shreya to review, test on real photos and own |
+| Onboarding: bedroom-window intro, Step 1 "Build your digital closet", demo closet option | done |
 | Style: color, shape, pattern, occasion rules | to do (Kshamaa) |
 | Motion with anime.js: timeline, outfit, closet, chat | first pass done |
 | Frontend polish, mobile, dark mode, effects inspired by reactbits / originkit | to do (Kshamaa) |

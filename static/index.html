@@ -15,6 +15,43 @@
     <canvas id="precip" aria-hidden="true"></canvas>
     <div class="grain" aria-hidden="true"></div>
 
+    <!-- Intro: a bedroom window onto the live sky (after motionsites.ai "Gateway Portal"). -->
+    <section id="portal" class="portal" aria-label="Welcome to Layer Lab">
+        <div class="scene" id="scene">
+            <div class="window" aria-hidden="true">
+                <span class="glare"></span>
+                <span class="muntin v"></span>
+                <span class="muntin h"></span>
+            </div>
+            <div class="sill" aria-hidden="true">
+                <svg class="plant" viewBox="0 0 64 70" aria-hidden="true">
+                    <path d="M32 44 C30 30 18 26 10 28 C18 32 24 36 30 44Z" fill="#6f8f5e" />
+                    <path d="M33 44 C34 26 44 18 54 18 C48 26 40 34 35 44Z" fill="#7fa06c" />
+                    <path d="M32 44 C31 34 32 22 34 12 C38 22 36 34 34 44Z" fill="#5f7f50" />
+                    <path d="M20 44 H44 L41 68 H23Z" fill="#b8643f" /><rect x="18" y="42" width="28" height="6" rx="2" fill="#c97650" />
+                </svg>
+            </div>
+            <div class="rod" aria-hidden="true"></div>
+            <div class="curtain left" aria-hidden="true"></div>
+            <div class="curtain right" aria-hidden="true"></div>
+        </div>
+        <div class="lamp-light" aria-hidden="true"></div>
+        <header class="portal-top">
+            <span class="word">Layer<em>Lab</em></span>
+            <span class="portal-temp" id="portal-temp">New York</span>
+        </header>
+        <div class="portal-copy">
+            <h1><em>Look</em> outside <br>before you <br>get dressed.</h1>
+            <p>That's the real sky over New York right now. Build your closet once, and Layer Lab dresses you
+                for the hours you're actually outside.</p>
+            <div class="portal-ctas">
+                <button id="enter" class="enter" type="button">Build my closet <span aria-hidden="true">→</span></button>
+                <button id="enter-demo" class="enter-demo" type="button">or try it with a demo closet</button>
+            </div>
+        </div>
+        <p class="portal-foot">Live sky · Open-Meteo<br>Esc opens the demo</p>
+    </section>
+
     <header class="topbar">
         <a class="wordmark" href="/" aria-label="Layer Lab home">
             <span class="mark" aria-hidden="true"><i></i><i></i><i></i></span>
@@ -34,6 +71,24 @@
     <main class="layout">
         <section class="chat panel" aria-label="Chat">
             <div id="messages">
+                <div id="setup" class="setup" hidden>
+                    <p class="eyebrow"><span class="dot" aria-hidden="true"></span>Step 1 of 2</p>
+                    <h1 class="hero-title">Build your <span class="rotator-static">digital closet.</span></h1>
+                    <p class="lede">Photograph each piece on its own, laid flat on a bed or a plain floor. Add a photo of
+                        the care label for exact fabrics. We scan every photo and you check the details.</p>
+                    <ul class="coverage" id="coverage">
+                        <li data-need="top"><i></i>A shirt or tee</li>
+                        <li data-need="bottom"><i></i>Bottoms or a dress</li>
+                        <li data-need="coat"><i></i>A coat</li>
+                        <li data-need="shoes"><i></i>Shoes</li>
+                    </ul>
+                    <div id="setup-adder-slot"></div>
+                    <div class="setup-actions">
+                        <button id="setup-done" class="primary big" type="button">Continue to your day <span aria-hidden="true">→</span></button>
+                        <button id="setup-demo" class="linkish" type="button">Use the demo closet instead</button>
+                    </div>
+                    <p class="meta setup-note" id="setup-note">Missing a coat or shoes? We'll borrow basics from a demo closet so outfits still work.</p>
+                </div>
                 <div id="intro" class="hero">
                     <p class="eyebrow"><span class="dot" aria-hidden="true"></span><span id="now">Checking the sky over New York</span></p>
                     <h1 class="hero-title">
@@ -81,14 +136,37 @@
                     <span id="outfit-meta" class="meta"></span>
                 </header>
                 <div id="outfit" class="empty">Your outfit appears here as a stack of layers, next to how warm it keeps you.</div>
+                <div class="me-slot" id="me-slot">
+                    <label class="me-photo" id="me-photo" title="Add a full-body photo">
+                        <input id="me-input" type="file" accept="image/*" hidden />
+                        <span class="me-empty" aria-hidden="true">+</span>
+                    </label>
+                    <div><b>Your photo</b><span class="meta" id="me-note">Add a full-body photo to see outfits on you (try-on is coming soon).</span></div>
+                    <button id="me-clear" class="linkish" type="button" hidden>Remove</button>
+                </div>
             </section>
 
             <section class="panel spot" aria-labelledby="closet-title">
                 <header class="panel-head">
                     <span class="num">03</span>
                     <h2 id="closet-title">Closet</h2>
-                    <span class="meta">Tap to send to the laundry</span>
+                    <button id="add-open" class="add-btn" type="button">+ Add clothes</button>
                 </header>
+                <div id="adder" class="adder" hidden>
+                    <label class="dropzone" id="dropzone">
+                        <input id="adder-input" type="file" accept="image/*" multiple hidden />
+                        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 16V4M7 9l5-5 5 5M4 20h16" /></svg>
+                        <b>Drop photos of your clothes</b>
+                        <span>or click to browse · one item per photo · JPG or PNG</span>
+                    </label>
+                    <div id="drafts" class="drafts"></div>
+                    <div class="adder-actions">
+                        <span id="adder-note" class="meta">We scan each photo, then you check the details.</span>
+                        <button id="adder-close" class="ghost" type="button">Cancel</button>
+                        <button id="add-all" class="primary" type="button" disabled>Add to closet</button>
+                    </div>
+                </div>
+                <p class="closet-hint meta">Tap an item to send it to the laundry</p>
                 <div id="closet" class="closet"></div>
             </section>
         </aside>

@@ -21,6 +21,9 @@ let closetItems = [];
 let shownPlan = null; // what the panels last animated, so a refresh doesn't replay
 let shownOutfit = null;
 let closetShown = false;
+let catalog = null; // garment types and fibers for the Add clothes form
+let personPhotoId = null;
+const photoUrl = (id) => `/image/${encodeURIComponent(sessionId)}/${encodeURIComponent(id)}`;
 
 const LOADING = ["Checking the forecast", "Working out warmth", "Going through your closet", "Layering it up"];
 const PHRASES = ["walk to class.", "bus stop at 6pm.", "three-hour lecture.", "first snow.", "subway platform.", "8am interview."];
@@ -188,7 +191,10 @@ function spark(x, y) {
 
 // ---------- Hero: variable-proximity heading + rotating phrase ----------
 
+let heroReady = false;
 function setupHero() {
+    if (heroReady) return;
+    heroReady = true;
     const pressure = document.querySelector(".pressure");
     const rotator = $("#rotator");
     if (!pressure) return;
@@ -256,6 +262,8 @@ async function loadConditions() {
         if (!res.ok) throw new Error();
         const c = await res.json();
         $("#now").textContent = `${c.temp_f}°F in ${c.location} right now · feels ${c.feels_like_f}°F · wind ${c.wind_mph} mph`;
+        const portalTemp = $("#portal-temp");
+        if (portalTemp) portalTemp.textContent = `${c.temp_f}°F · ${c.location}`;
         window.Sky?.set({
             mode: c.snow ? "snow" : c.rain ? "rain" : "calm",
             warmth: (c.temp_f - 15) / 65,
@@ -288,6 +296,10 @@ async function refresh() {
     renderDay(data.last_plan);
     renderCloset(data.last_outfit || []);
     renderOutfit();
+    personPhotoId = data.person_photo_id;
+    renderMe();
+    renderCoverage();
+    return data;
 }
 
 let thumbPlaced = false;
@@ -310,21 +322,42 @@ function renderSensitivity(level) {
 function renderCloset(selectedIds) {
     const el = $("#closet");
     el.innerHTML = "";
-    for (const item of closetItems) {
+    // Your own clothes first, then the demo closet.
+    const ordered = [...closetItems].sort((a, b) => (b.user_added ? 1 : 0) - (a.user_added ? 1 : 0));
+    for (const item of ordered) {
+        const cell = document.createElement("div");
+        cell.className = "item-cell";
         const btn = document.createElement("button");
-        btn.className = `item ${item.status}${selectedIds.includes(item.id) ? " selected" : ""}`;
+        btn.className = `item ${item.status}${selectedIds.includes(item.id) ? " selected" : ""}${item.photo_id ? " has-photo" : ""}`;
         btn.dataset.id = item.id;
         btn.title = `${item.name}: ${item.status.replace("_", " ")}. Tap to toggle laundry.`;
-        btn.innerHTML = `${garmentSvg(item)}<div>${escapeHtml(item.name)}</div><span class="clo">${item.clo} clo</span>`;
+        const visual = item.photo_id ? `<img class="photo" src="${photoUrl(item.photo_id)}" alt="">` : garmentSvg(item);
+        btn.innerHTML = `${visual}<div>${escapeHtml(item.name)}</div><span class="clo">${item.clo} clo</span>`;
         btn.addEventListener("click", () => toggleLaundry(item, btn));
         attachSpotlight(btn, 14);
-        el.appendChild(btn);
+        cell.appendChild(btn);
+        if (item.user_added) {
+            const rm = document.createElement("button");
+            rm.className = "rm";
+            rm.type = "button";
+            rm.setAttribute("aria-label", `Remove ${item.name}`);
+            rm.textContent = "×";
+            rm.addEventListener("click", () => removeItem(item, cell));
+            cell.appendChild(rm);
+        }
+        el.appendChild(cell);
     }
     if (!closetShown && closetItems.length) {
         closetShown = true;
         if (A) A.animate("#closet .item", { opacity: { from: 0 }, scale: { from: 0.85 }, duration: 700,
             delay: A.stagger(22, { grid: [3, Math.ceil(closetItems.length / 3)], from: "first" }), ease: "outExpo" });
     }
+}
+
+async function removeItem(item, cell) {
+    if (A) await A.animate(cell, { opacity: 0, scale: 0.8, duration: 300, ease: "inQuad" });
+    await fetch(`/wardrobe/item?session_id=${encodeURIComponent(sessionId)}&item_id=${encodeURIComponent(item.id)}`, { method: "DELETE" });
+    await refresh();
 }
 
 async function toggleLaundry(item, btn) {
@@ -426,9 +459,16 @@ function carousel(options, byId) {
         const worn = o.items.filter((x) => STACK_ORDER.includes(x.slot))
             .sort((a, b) => STACK_ORDER.indexOf(a.slot) - STACK_ORDER.indexOf(b.slot));
         const stripes = worn.map((x) => `<i style="background:${byId[x.id]?.color || "#ccc"};flex:${(x.clo + 0.08).toFixed(2)}"></i>`).join("");
+        const key = ["outer", "mid_top", "one_piece", "base_top", "bottom", "shoes"]
+            .map((sl) => o.items.find((x) => x.slot === sl)).filter(Boolean).slice(0, 4);
+        const collage = key.some((x) => byId[x.id]?.photo_id)
+            ? `<span class="fc-collage n${key.length}" aria-hidden="true">${key.map((x) => byId[x.id]?.photo_id
+                ? `<img src="${photoUrl(byId[x.id].photo_id)}" alt="">`
+                : `<span style="background:${byId[x.id]?.color || "#ccc"}">${garmentSvg({ ...byId[x.id], slot: x.slot })}</span>`).join("")}</span>`
+            : "";
         return `<button class="fc-card${i === optionIndex ? " is-focus" : ""}" data-i="${i}" aria-pressed="${i === optionIndex}"
                     style="flex-grow:${i === optionIndex ? CAROUSEL.focusGrow : 1}">
-            <span class="fc-swatch" aria-hidden="true">${stripes}</span>
+            ${collage || `<span class="fc-swatch" aria-hidden="true">${stripes}</span>`}
             <span class="fc-index">${String(i + 1).padStart(2, "0")}</span>
             <span class="fc-caption"><b>${escapeHtml(optionTitle(o))}</b><small>${escapeHtml(optionSubtitle(o))}</small></span>
         </button>`;
@@ -466,8 +506,9 @@ function renderOptionDetail(animate) {
     const extras = option.items.filter((i) => !STACK_ORDER.includes(i.slot));
     const layers = worn.map((i) => {
         const color = byId[i.id]?.color || "#cccccc";
+        const thumb = byId[i.id]?.photo_id ? `<img class="lthumb" src="${photoUrl(byId[i.id].photo_id)}" alt="">` : "";
         return `<div class="layer" style="--c:${color};--on:${textOn(color)};min-height:${Math.round(26 + i.clo * 46)}px">
-            ${escapeHtml(i.name)}<span class="slot">${SLOT_LABEL[i.slot]}</span><small>${i.clo}</small></div>`;
+            ${thumb}${escapeHtml(i.name)}<span class="slot">${SLOT_LABEL[i.slot]}</span><small>${i.clo}</small></div>`;
     }).join("");
 
     $("#option-detail").innerHTML = `
@@ -643,21 +684,246 @@ function renderAttachments() {
 
 fileEl.addEventListener("change", async () => {
     for (const file of fileEl.files) {
-        const form = new FormData();
-        form.append("session_id", sessionId);
-        form.append("file", file);
-        const res = await fetch("/upload", { method: "POST", body: form });
-        if (!res.ok) {
-            const err = await res.json().catch(() => ({}));
-            alert(err.detail || "Upload failed.");
-            continue;
+        try {
+            const data = await uploadFile(file);
+            pending.push({ id: data.image_id, url: data.url });
+        } catch (err) {
+            alert(err.message);
         }
-        const data = await res.json();
-        pending.push({ id: data.image_id, url: data.url });
     }
     fileEl.value = "";
     renderAttachments();
 });
+
+// ---------- Add clothes: upload, scan, review, save ----------
+
+const SLOT_NAMES = { base_top: "Tops", mid_top: "Sweaters and mid layers", outer: "Coats and jackets", bottom: "Bottoms",
+    one_piece: "Dresses", legwear: "Tights and leggings", socks: "Socks", shoes: "Shoes", head: "Hats", hands: "Gloves", neck: "Scarves" };
+let drafts = [];
+
+async function loadCatalog() {
+    if (!catalog) catalog = await (await fetch("/catalog")).json();
+    return catalog;
+}
+
+function typeSelect(selected) {
+    const groups = Object.entries(SLOT_NAMES).map(([slot, label]) => {
+        const opts = catalog.garments.filter((g) => g.slot === slot)
+            .map((g) => `<option value="${g.type}"${g.type === selected ? " selected" : ""}>${escapeHtml(g.label)}</option>`).join("");
+        return opts ? `<optgroup label="${label}">${opts}</optgroup>` : "";
+    }).join("");
+    return `<select class="d-type" aria-label="Garment type"><option value="">What is it?</option>${groups}</select>`;
+}
+
+function materialSelect(selected) {
+    return `<select class="d-mat" aria-label="Main material">${catalog.materials
+        .map((m) => `<option value="${m}"${m === selected ? " selected" : ""}>${m[0].toUpperCase() + m.slice(1)}</option>`).join("")}</select>`;
+}
+
+const mainFiber = (mix) => Object.entries(mix || {}).sort((a, b) => b[1] - a[1])[0]?.[0];
+
+async function uploadFile(file) {
+    const form = new FormData();
+    form.append("session_id", sessionId);
+    form.append("file", file);
+    const res = await fetch("/upload", { method: "POST", body: form });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.detail || "Upload failed.");
+    return data;
+}
+
+function setStatus(d, text, kind = "") {
+    const el = d.el.querySelector(".d-status");
+    el.className = `d-status ${kind}`;
+    el.textContent = text;
+}
+
+function updateAddButton() {
+    const ready = drafts.filter((d) => d.photoId && !d.busy);
+    $("#add-all").disabled = !ready.length || drafts.some((d) => d.busy);
+    $("#add-all").textContent = ready.length > 1 ? `Add ${ready.length} to closet` : "Add to closet";
+}
+
+async function addDraft(file) {
+    await loadCatalog();
+    const d = { photoId: null, labelId: null, scan: null, busy: true, el: document.createElement("div") };
+    d.el.className = "draft";
+    d.el.innerHTML = `<img class="d-thumb" alt="">
+        <div class="d-fields">
+            <input class="d-name" placeholder="Name, e.g. Green wool sweater" maxlength="40" />
+            <div class="d-row">${typeSelect("")}${materialSelect("cotton")}</div>
+            <div class="d-row d-meta">
+                <label class="d-label">+ Care label photo<input type="file" accept="image/*" hidden /></label>
+                <span class="d-status"></span>
+            </div>
+        </div>
+        <button class="d-remove" type="button" aria-label="Remove">×</button>`;
+    d.el.querySelector(".d-thumb").src = URL.createObjectURL(file);
+    d.el.querySelector(".d-remove").addEventListener("click", () => {
+        drafts = drafts.filter((x) => x !== d);
+        d.el.remove();
+        updateAddButton();
+    });
+    d.el.querySelector(".d-label input").addEventListener("change", async (e) => {
+        const f = e.target.files[0];
+        if (!f) return;
+        d.busy = true;
+        updateAddButton();
+        try {
+            d.labelId = (await uploadFile(f)).image_id;
+            d.el.querySelector(".d-label").firstChild.textContent = "✓ Care label added ";
+            await scanDraft(d);
+        } catch (err) {
+            setStatus(d, err.message, "bad");
+        }
+        d.busy = false;
+        updateAddButton();
+    });
+    drafts.push(d);
+    $("#drafts").appendChild(d.el);
+    if (A) A.animate(d.el, { opacity: { from: 0 }, translateY: { from: 14 }, duration: 500, ease: "outExpo" });
+    updateAddButton();
+
+    setStatus(d, "Uploading...", "busy");
+    try {
+        d.photoId = (await uploadFile(file)).image_id;
+        await scanDraft(d);
+    } catch (err) {
+        setStatus(d, err.message, "bad");
+    }
+    d.busy = false;
+    updateAddButton();
+}
+
+async function scanDraft(d) {
+    setStatus(d, "Scanning the photo...", "busy");
+    const res = await fetch("/wardrobe/scan", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ session_id: sessionId, photo_id: d.photoId, label_photo_id: d.labelId }),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) {
+        d.el.classList.add("manual");
+        setStatus(d, `${data.detail || "Couldn't scan."} Fill in the details.`, "bad");
+        return;
+    }
+    d.scan = data;
+    d.el.classList.remove("manual");
+    d.el.querySelector(".d-name").value = data.name;
+    d.el.querySelector(".d-type").value = data.garment_type;
+    d.el.querySelector(".d-mat").value = mainFiber(data.materials) || "cotton";
+    const fibers = Object.entries(data.materials).map(([m, p]) => `${p}% ${m}`).join(", ");
+    setStatus(d, data.materials_source === "label" ? `Read from label: ${fibers}` : `Guessed ${fibers}. A care label photo makes it exact.`, "ok");
+    if (A) A.animate(d.el.querySelectorAll(".d-name, .d-type, .d-mat"), { backgroundColor: { from: "rgba(224,87,47,0.18)" }, duration: 900, ease: "outQuad" });
+}
+
+async function saveDrafts() {
+    const ready = drafts.filter((d) => d.photoId);
+    const missing = ready.filter((d) => !d.el.querySelector(".d-type").value);
+    if (missing.length) {
+        missing.forEach((d) => setStatus(d, "Pick what kind of item this is.", "bad"));
+        return;
+    }
+    $("#add-all").disabled = true;
+    const added = [];
+    const saved = new Set();
+    for (const d of ready) {
+        const type = d.el.querySelector(".d-type").value;
+        const mat = d.el.querySelector(".d-mat").value;
+        const scan = d.scan || {};
+        const item = {
+            ...scan,
+            name: d.el.querySelector(".d-name").value || undefined,
+            garment_type: type,
+            materials: mainFiber(scan.materials) === mat ? scan.materials : { [mat]: 100 },
+            photo_id: d.photoId,
+            label_photo_id: d.labelId,
+        };
+        const res = await fetch("/wardrobe/item", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ session_id: sessionId, item }),
+        });
+        if (res.ok) {
+            added.push((await res.json()).id);
+            saved.add(d);
+        } else {
+            setStatus(d, ((await res.json().catch(() => ({}))).detail) || "Couldn't save.", "bad");
+        }
+    }
+    saved.forEach((d) => d.el.remove());
+    drafts = drafts.filter((d) => !saved.has(d));
+    drafts.length ? updateAddButton() : closeAdder();
+    await refresh();
+    if (A) A.animate(added.map((id) => document.querySelector(`#closet .item[data-id="${CSS.escape(id)}"]`)).filter(Boolean),
+        { scale: { from: 0.6 }, opacity: { from: 0 }, duration: 800, delay: A.stagger(80), ease: "outBack(1.8)" });
+}
+
+function openAdder() {
+    const el = $("#adder");
+    el.hidden = false;
+    $("#add-open").hidden = true;
+    loadCatalog();
+    if (A) A.animate(el, { opacity: { from: 0 }, translateY: { from: -10 }, duration: 450, ease: "outExpo" });
+}
+function closeAdder() {
+    if (document.body.classList.contains("in-setup")) {  // Step 1 keeps the drop zone open
+        $("#drafts").innerHTML = "";
+        drafts = [];
+        updateAddButton();
+        return;
+    }
+    $("#adder").hidden = true;
+    $("#add-open").hidden = false;
+    $("#drafts").innerHTML = "";
+    drafts = [];
+    updateAddButton();
+}
+
+$("#add-open").addEventListener("click", openAdder);
+$("#adder-close").addEventListener("click", closeAdder);
+$("#add-all").addEventListener("click", saveDrafts);
+$("#adder-input").addEventListener("change", (e) => { [...e.target.files].forEach(addDraft); e.target.value = ""; });
+const dropzone = $("#dropzone");
+["dragenter", "dragover"].forEach((t) => dropzone.addEventListener(t, (e) => { e.preventDefault(); dropzone.classList.add("over"); }));
+["dragleave", "drop"].forEach((t) => dropzone.addEventListener(t, (e) => { e.preventDefault(); dropzone.classList.remove("over"); }));
+dropzone.addEventListener("drop", (e) => [...e.dataTransfer.files].filter((f) => f.type.startsWith("image/")).forEach(addDraft));
+
+// ---------- Your photo (for try-on) ----------
+
+function renderMe() {
+    const box = $("#me-photo");
+    box.style.backgroundImage = personPhotoId ? `url("${photoUrl(personPhotoId)}")` : "";
+    box.classList.toggle("filled", !!personPhotoId);
+    $("#me-clear").hidden = !personPhotoId;
+    $("#me-note").textContent = personPhotoId
+        ? "Saved for this session. Try-on previews are coming soon."
+        : "Add a full-body photo to see outfits on you (try-on is coming soon).";
+}
+
+async function setMe(imageId) {
+    const res = await fetch("/me/photo", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ session_id: sessionId, image_id: imageId }),
+    });
+    if (res.ok) personPhotoId = (await res.json()).person_photo_id;
+    renderMe();
+    if (A && personPhotoId) A.animate("#me-photo", { scale: { from: 0.7 }, duration: 700, ease: "outBack(2)" });
+}
+
+$("#me-input").addEventListener("change", async (e) => {
+    const f = e.target.files[0];
+    e.target.value = "";
+    if (!f) return;
+    try {
+        await setMe((await uploadFile(f)).image_id);
+    } catch (err) {
+        $("#me-note").textContent = err.message;
+    }
+});
+$("#me-clear").addEventListener("click", () => setMe(null));
 
 // ---------- Wiring ----------
 
@@ -699,7 +965,166 @@ window.addEventListener("resize", () => {
     if (active) { thumbPlaced = false; renderSensitivity(active.dataset.level); }
 });
 
-sessionId = load("layerlab-session");
-setupHero();
-loadConditions();
-document.fonts.ready.then(refresh);
+// ---------- Step 1: build your digital closet ----------
+
+const ESSENTIALS = { top: ["base_top", "one_piece"], bottom: ["bottom", "one_piece"], coat: ["outer"], shoes: ["shoes"] };
+
+function renderCoverage() {
+    document.querySelectorAll("#coverage li").forEach((li) => {
+        const count = closetItems.filter((i) => ESSENTIALS[li.dataset.need].includes(i.slot)).length;
+        const wasDone = li.classList.contains("done");
+        li.classList.toggle("done", count > 0);
+        li.querySelector("b")?.remove();
+        if (count) li.insertAdjacentHTML("beforeend", `<b>${count}</b>`);
+        if (A && count && !wasDone) A.animate(li, { scale: [1, 1.12, 1], duration: 500, ease: "outBack(2)" });
+    });
+    const missing = [...document.querySelectorAll("#coverage li:not(.done)")].length;
+    const own = closetItems.filter((i) => i.user_added).length;
+    $("#setup-note").textContent = !own
+        ? "Missing a coat or shoes? We'll borrow basics from a demo closet so outfits still work."
+        : missing ? `${own} piece${own > 1 ? "s" : ""} added. Anything still missing gets borrowed from a demo closet.`
+        : `${own} pieces added. Your closet covers everything, nice.`;
+}
+
+function showSetup() {
+    document.body.classList.add("in-setup");
+    $("#setup").hidden = false;
+    $("#intro").hidden = true;
+    const adder = $("#adder");
+    $("#setup-adder-slot").appendChild(adder);
+    adder.hidden = false;
+    $("#add-open").hidden = true;
+    loadCatalog();
+    renderCoverage();
+    if (A) enter("#setup > *", { delay: 70, y: 18, duration: 800 });
+}
+
+function showChat(note) {
+    document.body.classList.remove("in-setup");
+    $("#setup").hidden = true;
+    const adder = $("#adder");
+    $("#closet").before(adder);
+    adder.hidden = true;
+    $("#add-open").hidden = false;
+    const intro = $("#intro");
+    if (intro) intro.hidden = false;
+    setupHero();
+    if (note) {
+        const div = document.createElement("div");
+        div.className = "chat-note";
+        div.textContent = note;
+        messagesEl.appendChild(div);
+        enter(div, { y: 8 });
+    }
+}
+
+async function startMode(mode) {
+    await fetch("/wardrobe/start", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ session_id: sessionId, mode }),
+    });
+    closetShown = false;
+    await refresh();
+}
+
+async function finishSetup() {
+    if (drafts.some((d) => d.photoId)) await saveDrafts();  // don't lose pieces still in the list
+    const res = await fetch("/wardrobe/finish", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ session_id: sessionId }),
+    });
+    const { borrowed } = await res.json();
+    await refresh();
+    const own = closetItems.filter((i) => i.user_added).length;
+    if (A) await A.animate("#setup", { opacity: 0, translateY: -16, duration: 350, ease: "inQuad" });
+    showChat(`Closet ready: ${own} of your own piece${own === 1 ? "" : "s"}${borrowed.length ? ` + borrowed ${borrowed.join(", ").toLowerCase()}` : ""}`);
+}
+
+$("#setup-done").addEventListener("click", finishSetup);
+$("#setup-demo").addEventListener("click", async () => {
+    await startMode("demo");
+    if (A) await A.animate("#setup", { opacity: 0, translateY: -16, duration: 350, ease: "inQuad" });
+    showChat("Using the demo closet (27 pieces)");
+});
+
+// ---------- Intro: a bedroom window onto today's sky ----------
+
+function portalSeen() {
+    try { return sessionStorage.getItem("layerlab-portal") === "1"; } catch (e) { return false; }
+}
+function markPortalSeen() {
+    try { sessionStorage.setItem("layerlab-portal", "1"); } catch (e) { /* fine */ }
+}
+
+function enterApp(view) {
+    view === "setup" ? showSetup() : showChat();
+    if (A) A.animate(".topbar, .chat, .panels .panel", { opacity: { from: 0 }, translateY: { from: 40 }, scale: { from: 0.98 },
+        duration: 1000, delay: A.stagger(90), ease: "outExpo" });
+}
+
+function runPortal(setupDone) {
+    const portal = $("#portal");
+    if (portalSeen() || !portal) {
+        portal?.remove();
+        if (setupDone) return enterApp("chat");
+        // Mid-setup reload: keep what they already added; otherwise start from an empty closet.
+        const started = closetItems.some((i) => i.user_added) ? Promise.resolve() : startMode("own");
+        started.then(() => enterApp("setup"));
+        return;
+    }
+    document.body.classList.add("at-portal");
+    const scene = $("#scene");
+    const curtains = portal.querySelectorAll(".curtain");
+
+    // Curtains draw back to show today's sky, and the copy settles in.
+    if (A) {
+        A.animate(curtains, { scaleX: { from: 1, to: 0.36 }, duration: 2000, delay: 500, ease: "inOutQuart" });
+        A.animate(".portal-top, .portal-copy > *, .portal-foot", { opacity: { from: 0 }, translateY: { from: 22 },
+            duration: 1000, delay: A.stagger(110, { start: 300 }), ease: "outExpo" });
+    } else {
+        curtains.forEach((c) => c.classList.add("open"));
+    }
+
+    const tilt = (e) => {
+        const x = e.clientX / window.innerWidth - 0.5, y = e.clientY / window.innerHeight - 0.5;
+        scene.style.transform = `perspective(1100px) rotateY(${x * 8}deg) rotateX(${-y * 6}deg)`;
+    };
+    if (finePointer && !reduceMotion) window.addEventListener("pointermove", tilt);
+
+    let leaving = false;
+    const onKey = (e) => { if (e.key === "Escape") go("demo"); };
+    async function go(mode) {
+        if (leaving) return;
+        leaving = true;
+        markPortalSeen();
+        window.removeEventListener("pointermove", tilt);
+        document.removeEventListener("keydown", onKey);
+        const ready = startMode(mode);
+        if (A) {
+            A.animate(".portal-top, .portal-copy, .portal-foot, .lamp-light", { opacity: 0, translateY: -14, duration: 380, ease: "inQuad" });
+            scene.style.transform = "";
+            await A.animate(scene, { scale: 14, duration: 1300, delay: 120, ease: "inOutExpo" });
+        }
+        await ready;
+        portal.remove();
+        document.body.classList.remove("at-portal");
+        enterApp(mode === "own" ? "setup" : "chat");
+    }
+    $("#enter").addEventListener("click", () => go("own"));
+    $("#enter-demo").addEventListener("click", () => go("demo"));
+    document.addEventListener("keydown", onKey);
+    $("#enter").focus({ preventScroll: true });
+}
+
+(async function init() {
+    sessionId = load("layerlab-session");
+    loadConditions();
+    const data = await refresh();
+    document.fonts.ready.then(() => {
+        const active = document.querySelector('.thermostat button[aria-checked="true"]');
+        if (active) { thumbPlaced = false; renderSensitivity(active.dataset.level); }
+    });
+    runPortal(data.setup_done);
+})();
