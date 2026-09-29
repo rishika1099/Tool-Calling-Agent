@@ -71,6 +71,30 @@ function garmentSvg(item) {
     return `<svg viewBox="0 0 40 40" aria-hidden="true"><path d="${path}" fill="${color}" stroke="currentColor" stroke-opacity="0.25" stroke-width="1"/></svg>`;
 }
 
+// ---------- Motion (anime.js; skipped for reduced motion or if the CDN fails) ----------
+
+const motion = !window.matchMedia("(prefers-reduced-motion: reduce)").matches && window.anime?.animate ? window.anime : null;
+let shownPlan = null; // what the panels last animated, so a refresh doesn't replay
+let shownOutfit = null;
+let closetShown = false;
+
+function enter(targets, { delay = 60, y = 10 } = {}) {
+    if (!motion) return;
+    motion.animate(targets, { opacity: { from: 0 }, translateY: { from: y }, duration: 520, delay: motion.stagger(delay), ease: "outCubic" });
+}
+
+function growBars(targets) {
+    if (!motion) return;
+    motion.animate(targets, { scaleX: { from: 0 }, duration: 700, delay: motion.stagger(90, { start: 150 }), ease: "outExpo" });
+}
+
+function countUp(el) {
+    const to = parseFloat(el.textContent);
+    if (!motion || Number.isNaN(to)) return;
+    const state = { v: 0 };
+    motion.animate(state, { v: to, duration: 900, ease: "outCubic", onUpdate: () => { el.textContent = state.v.toFixed(2); } });
+}
+
 // ---------- Session + closet ----------
 
 async function refresh() {
@@ -103,6 +127,10 @@ function renderCloset(selectedIds) {
         btn.addEventListener("click", () => toggleLaundry(item));
         el.appendChild(btn);
     }
+    if (!closetShown && closetItems.length) {
+        closetShown = true;
+        enter("#closet .item", { delay: 18, y: 6 });
+    }
 }
 
 async function toggleLaundry(item) {
@@ -131,7 +159,9 @@ function renderDay(plan) {
     $("#day-meta").textContent = `${plan.location} · ${plan.date}`;
     const max = 3;
     const pct = (v) => `${Math.min(100, (v / max) * 100)}%`;
-    el.innerHTML = plan.segments.map((s) => {
+    const alerts = (plan.active_alerts || []).map((a) =>
+        `<div class="alert"><strong>${escapeHtml(a.event)}</strong>${a.headline ? ` · ${escapeHtml(a.headline)}` : ""}</div>`).join("");
+    el.innerHTML = alerts + plan.segments.map((s) => {
         const cond = s.setting === "outdoors"
             ? `${s.temp_f}°F, feels ${s.feels_like_f}°F · wind ${s.wind_mph} mph · ${s.precip_chance_pct}% rain`
             : `${s.temp_f}°F inside`;
@@ -146,6 +176,13 @@ function renderDay(plan) {
             </div>
         </div>`;
     }).join("") + `<div class="scale"><span>0 clo</span><span>1.5</span><span>3 clo</span></div>`;
+
+    const key = JSON.stringify(plan);
+    if (key !== shownPlan) {
+        shownPlan = key;
+        enter("#day .alert, #day .seg", { delay: 80 });
+        growBars("#day .bar .range");
+    }
 }
 
 // ---------- Outfit ----------
@@ -177,14 +214,20 @@ function renderOutfit() {
         </div>
         <div class="fits">
             <div class="fit"><div class="label">Indoors</div>
-                <div class="value">${option.indoor_clo} clo</div>
+                <div class="value"><span class="num">${option.indoor_clo}</span> clo</div>
                 <div class="verdict ${verdictClass(option.indoors)}">${option.indoors}${t.indoor_clo_ideal != null ? ` · target ${t.indoor_clo_ideal}` : ""}</div></div>
             <div class="fit"><div class="label">Outdoors</div>
-                <div class="value">${option.outdoor_clo} clo</div>
+                <div class="value"><span class="num">${option.outdoor_clo}</span> clo</div>
                 <div class="verdict ${verdictClass(option.outdoors)}">${option.outdoors}${t.outdoor_clo_ideal != null ? ` · target ${t.outdoor_clo_ideal}` : ""}</div></div>
         </div>
         ${option.take_off_indoors.length ? `<p class="notes" style="padding:0;margin-top:10px">Take off indoors: ${option.take_off_indoors.map(escapeHtml).join(", ")}</p>` : ""}
         ${option.notes.length ? `<ul class="notes">${option.notes.map((n) => `<li>${escapeHtml(n)}</li>`).join("")}</ul>` : ""}`;
+
+    if (lastOutfit !== shownOutfit) {
+        shownOutfit = lastOutfit;
+        enter("#outfit .piece", { delay: 45, y: 8 });
+        document.querySelectorAll("#outfit .num").forEach(countUp);
+    }
 }
 
 // ---------- Chat ----------
@@ -201,6 +244,7 @@ function addUserMessage(text, photos) {
         div.appendChild(img);
     }
     messagesEl.appendChild(div);
+    enter(div, { y: 8 });
 }
 
 function addAssistantMessage(response, toolCalls) {
@@ -213,7 +257,7 @@ function addAssistantMessage(response, toolCalls) {
             const details = document.createElement("details");
             let pretty = call.result;
             try { pretty = JSON.stringify(JSON.parse(call.result), null, 2); } catch (e) { /* not JSON */ }
-            details.innerHTML = `<summary><b>${escapeHtml(call.name)}</b>(${escapeHtml(JSON.stringify(call.args)).slice(0, 90)})</summary>
+            details.innerHTML = `<summary><b>${escapeHtml(call.name)}</b>(${escapeHtml(JSON.stringify(call.args).slice(0, 90))})</summary>
                 <pre>${escapeHtml(`args: ${JSON.stringify(call.args, null, 2)}\n\nresult: ${pretty}`)}</pre>`;
             tools.appendChild(details);
         }
@@ -224,6 +268,7 @@ function addAssistantMessage(response, toolCalls) {
     content.innerHTML = renderMarkdown(response);
     div.appendChild(content);
     messagesEl.appendChild(div);
+    enter(div.querySelectorAll(".tools details, .content"), { delay: 70, y: 8 });
 }
 
 async function sendMessage(text) {

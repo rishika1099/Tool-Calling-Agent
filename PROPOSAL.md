@@ -19,6 +19,7 @@ Due **Wed Oct 7, 11:59pm**. Team: Rishika (rishika1099), Shreya (shreyashetty2),
 | Feature | Status |
 |---|---|
 | Hourly forecast for the user's outdoor hours | done |
+| Official NWS weather alerts (wind chill, winter storms) in the day plan | done |
 | Warmth needed per segment, indoor vs outdoor, layering plan | done |
 | Cold sensitivity ("I run cold / average / I run warm") | done (feedback learning is a bonus) |
 | Indoors vs outdoors, NYC heat-law indoor temperatures, transit = coat on | done |
@@ -27,7 +28,10 @@ Due **Wed Oct 7, 11:59pm**. Team: Rishika (rishika1099), Shreya (shreyashetty2),
 | Laundry: automatic wear limits per garment type | to do (Shreya) |
 | Add clothes from photos + care labels | to do (Shreya) |
 | Style: color, shape, pattern, occasion rules | to do (Kshamaa) |
-| Frontend polish, mobile, dark mode, weather animation | to do (Kshamaa) |
+| Motion with anime.js: timeline, outfit, closet, chat | first pass done |
+| Frontend polish, mobile, dark mode, effects inspired by reactbits / originkit | to do (Kshamaa) |
+| Offline tests (`uv run pytest`) and tool-selection evals | done (run evals once credentials are set up) |
+| Architecture diagram in the README | done |
 | Deploy to Cloud Run | to do (Rishika) |
 | Comfort feedback ("I was freezing") adjusts future plans | bonus (Rishika) |
 | Try-on image (Vertex AI) | bonus (Rishika) |

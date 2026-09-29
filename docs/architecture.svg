@@ -1,0 +1,86 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 108 960 440" width="960" height="440" role="img" aria-labelledby="ll-arch-title ll-arch-desc">
+<title id="ll-arch-title">Layer Lab architecture</title>
+<desc id="ll-arch-desc">The browser page posts chat messages to FastAPI endpoints on Cloud Run. The run_agent loop sends the conversation and tool schemas to Gemini on Vertex AI, which returns tool calls. The loop runs tools, which read and write session state, read clothing warmth tables, and call Open-Meteo and the National Weather Service.</desc>
+<defs>
+<marker id="ll-arrow" viewBox="0 0 8 8" refX="8" refY="4" markerWidth="8" markerHeight="8" markerUnits="userSpaceOnUse" orient="auto"><path d="M0,0 L8,4 L0,8 Z" fill="#6f6a62"/></marker>
+<marker id="ll-arrow-link" viewBox="0 0 8 8" refX="8" refY="4" markerWidth="8" markerHeight="8" markerUnits="userSpaceOnUse" orient="auto"><path d="M0,0 L8,4 L0,8 Z" fill="#3f6c8c"/></marker>
+</defs>
+<rect y="108" width="960" height="440" rx="10" fill="#f4f0e8"/>
+<rect x="196" y="132" width="536" height="344" rx="8" fill="rgba(30,28,25,0.025)" stroke="rgba(30,28,25,0.16)" stroke-width="0.8" stroke-dasharray="4,3"/>
+<rect x="208" y="136" width="104" height="12" rx="2" fill="#f4f0e8"/>
+<text x="212" y="145" fill="#8c857b" font-size="7" font-family="ui-monospace, 'SF Mono', Menlo, Consolas, monospace" letter-spacing="0.14em">CLOUD RUN · APP.PY</text>
+<line x1="160" y1="196" x2="228" y2="196" stroke="#6f6a62" stroke-width="1.2" marker-end="url(#ll-arrow)"/>
+<rect x="162" y="178" width="64" height="12" rx="2" fill="#f4f0e8"/>
+<text x="194" y="187" fill="#6f6a62" font-size="8" font-family="ui-monospace, 'SF Mono', Menlo, Consolas, monospace" letter-spacing="0.06em" text-anchor="middle">POST /CHAT</text>
+<line x1="368" y1="196" x2="424" y2="196" stroke="#6f6a62" stroke-width="1.2" marker-end="url(#ll-arrow)"/>
+<line x1="564" y1="185" x2="772" y2="185" stroke="#6f6a62" stroke-width="1.2" marker-end="url(#ll-arrow)"/>
+<rect x="626" y="167" width="84" height="12" rx="2" fill="#f4f0e8"/>
+<text x="668" y="176" fill="#6f6a62" font-size="8" font-family="ui-monospace, 'SF Mono', Menlo, Consolas, monospace" letter-spacing="0.06em" text-anchor="middle">PROMPT + TOOLS</text>
+<line x1="772" y1="207" x2="564" y2="207" stroke="#6f6a62" stroke-width="1" stroke-dasharray="4,3" marker-end="url(#ll-arrow)"/>
+<rect x="636" y="213" width="64" height="12" rx="2" fill="#f4f0e8"/>
+<text x="668" y="222" fill="#6f6a62" font-size="8" font-family="ui-monospace, 'SF Mono', Menlo, Consolas, monospace" letter-spacing="0.06em" text-anchor="middle">TOOL CALLS</text>
+<line x1="494" y1="228" x2="494" y2="292" stroke="#6f6a62" stroke-width="1.2" marker-end="url(#ll-arrow)"/>
+<rect x="504" y="254" width="52" height="12" rx="2" fill="#f4f0e8"/>
+<text x="530" y="263" fill="#6f6a62" font-size="8" font-family="ui-monospace, 'SF Mono', Menlo, Consolas, monospace" letter-spacing="0.06em" text-anchor="middle">RUN TOOL</text>
+<line x1="298" y1="228" x2="298" y2="292" stroke="#6f6a62" stroke-width="1" stroke-dasharray="4,3" marker-end="url(#ll-arrow)"/>
+<rect x="308" y="254" width="44" height="12" rx="2" fill="#f4f0e8"/>
+<text x="330" y="263" fill="#6f6a62" font-size="8" font-family="ui-monospace, 'SF Mono', Menlo, Consolas, monospace" letter-spacing="0.06em" text-anchor="middle">PANELS</text>
+<line x1="424" y1="324" x2="368" y2="324" stroke="#6f6a62" stroke-width="1.2" marker-end="url(#ll-arrow)"/>
+<line x1="564" y1="324" x2="772" y2="324" stroke="#3f6c8c" stroke-width="1.2" marker-end="url(#ll-arrow-link)"/>
+<rect x="628" y="306" width="80" height="12" rx="2" fill="#f4f0e8"/>
+<text x="668" y="315" fill="#3f6c8c" font-size="8" font-family="ui-monospace, 'SF Mono', Menlo, Consolas, monospace" letter-spacing="0.06em" text-anchor="middle">HTTPS, NO KEY</text>
+<line x1="494" y1="356" x2="494" y2="404" stroke="#6f6a62" stroke-width="1.2" marker-end="url(#ll-arrow)"/>
+<rect x="504" y="374" width="64" height="12" rx="2" fill="#f4f0e8"/>
+<text x="536" y="383" fill="#6f6a62" font-size="8" font-family="ui-monospace, 'SF Mono', Menlo, Consolas, monospace" letter-spacing="0.06em" text-anchor="middle">CLO VALUES</text>
+<rect x="24" y="164" width="136" height="64" rx="6" fill="#fffdf9" stroke="#6f6a62" stroke-width="1"/>
+<rect x="36" y="174" width="45" height="12" rx="2" fill="none" stroke="#6f6a62" stroke-width="0.8"/>
+<text x="40" y="183" fill="#6f6a62" font-size="7" font-family="ui-monospace, 'SF Mono', Menlo, Consolas, monospace" letter-spacing="0.14em">BROWSER</text>
+<text x="36" y="202" fill="#1e1c19" font-size="12" font-weight="600" font-family="Inter, 'Helvetica Neue', Arial, sans-serif">Layer Lab page</text>
+<text x="36" y="216" fill="#6f6a62" font-size="9" font-family="ui-monospace, 'SF Mono', Menlo, Consolas, monospace">static/ · anime.js</text>
+<rect x="228" y="164" width="140" height="64" rx="6" fill="#fffdf9" stroke="#1e1c19" stroke-width="1"/>
+<rect x="240" y="174" width="45" height="12" rx="2" fill="none" stroke="#1e1c19" stroke-width="0.8"/>
+<text x="244" y="183" fill="#1e1c19" font-size="7" font-family="ui-monospace, 'SF Mono', Menlo, Consolas, monospace" letter-spacing="0.14em">FASTAPI</text>
+<text x="240" y="202" fill="#1e1c19" font-size="12" font-weight="600" font-family="Inter, 'Helvetica Neue', Arial, sans-serif">Endpoints</text>
+<text x="240" y="216" fill="#6f6a62" font-size="9" font-family="ui-monospace, 'SF Mono', Menlo, Consolas, monospace">/chat · /upload</text>
+<rect x="424" y="164" width="140" height="64" rx="6" fill="#f6e7e0" stroke="#b5543a" stroke-width="1"/>
+<rect x="436" y="174" width="45" height="12" rx="2" fill="none" stroke="#b5543a" stroke-width="0.8"/>
+<text x="440" y="183" fill="#b5543a" font-size="7" font-family="ui-monospace, 'SF Mono', Menlo, Consolas, monospace" letter-spacing="0.14em">HARNESS</text>
+<text x="436" y="202" fill="#1e1c19" font-size="12" font-weight="600" font-family="Inter, 'Helvetica Neue', Arial, sans-serif">Agent loop</text>
+<text x="436" y="216" fill="#6f6a62" font-size="9" font-family="ui-monospace, 'SF Mono', Menlo, Consolas, monospace">run_agent()</text>
+<rect x="228" y="292" width="140" height="64" rx="6" fill="#ebe4d6" stroke="#6f6a62" stroke-width="1"/>
+<rect x="240" y="302" width="35" height="12" rx="2" fill="none" stroke="#6f6a62" stroke-width="0.8"/>
+<text x="244" y="311" fill="#6f6a62" font-size="7" font-family="ui-monospace, 'SF Mono', Menlo, Consolas, monospace" letter-spacing="0.14em">STATE</text>
+<text x="240" y="330" fill="#1e1c19" font-size="12" font-weight="600" font-family="Inter, 'Helvetica Neue', Arial, sans-serif">Session</text>
+<text x="240" y="344" fill="#6f6a62" font-size="9" font-family="ui-monospace, 'SF Mono', Menlo, Consolas, monospace">closet, plan, photos</text>
+<rect x="424" y="292" width="140" height="64" rx="6" fill="#fffdf9" stroke="#1e1c19" stroke-width="1"/>
+<rect x="436" y="302" width="61" height="12" rx="2" fill="none" stroke="#1e1c19" stroke-width="0.8"/>
+<text x="440" y="311" fill="#1e1c19" font-size="7" font-family="ui-monospace, 'SF Mono', Menlo, Consolas, monospace" letter-spacing="0.14em">TOOLS · 10</text>
+<text x="436" y="330" fill="#1e1c19" font-size="12" font-weight="600" font-family="Inter, 'Helvetica Neue', Arial, sans-serif">Warmth + outfit</text>
+<text x="436" y="344" fill="#6f6a62" font-size="9" font-family="ui-monospace, 'SF Mono', Menlo, Consolas, monospace">tools/*.py</text>
+<rect x="424" y="404" width="140" height="56" rx="6" fill="#ebe4d6" stroke="#6f6a62" stroke-width="1"/>
+<rect x="436" y="414" width="29" height="12" rx="2" fill="none" stroke="#6f6a62" stroke-width="0.8"/>
+<text x="440" y="423" fill="#6f6a62" font-size="7" font-family="ui-monospace, 'SF Mono', Menlo, Consolas, monospace" letter-spacing="0.14em">DATA</text>
+<text x="436" y="440" fill="#1e1c19" font-size="12" font-weight="600" font-family="Inter, 'Helvetica Neue', Arial, sans-serif">Clo tables</text>
+<text x="436" y="454" fill="#6f6a62" font-size="9" font-family="ui-monospace, 'SF Mono', Menlo, Consolas, monospace">data/*.csv</text>
+<rect x="772" y="164" width="164" height="64" rx="6" fill="#fffdf9" stroke="#3f6c8c" stroke-width="1"/>
+<rect x="784" y="174" width="56" height="12" rx="2" fill="none" stroke="#3f6c8c" stroke-width="0.8"/>
+<text x="788" y="183" fill="#3f6c8c" font-size="7" font-family="ui-monospace, 'SF Mono', Menlo, Consolas, monospace" letter-spacing="0.14em">VERTEX AI</text>
+<text x="784" y="202" fill="#1e1c19" font-size="12" font-weight="600" font-family="Inter, 'Helvetica Neue', Arial, sans-serif">Gemini</text>
+<text x="784" y="216" fill="#6f6a62" font-size="9" font-family="ui-monospace, 'SF Mono', Menlo, Consolas, monospace">gemini-3.5-flash-lite</text>
+<rect x="772" y="292" width="164" height="64" rx="6" fill="#fffdf9" stroke="#3f6c8c" stroke-width="1"/>
+<rect x="784" y="302" width="51" height="12" rx="2" fill="none" stroke="#3f6c8c" stroke-width="0.8"/>
+<text x="788" y="311" fill="#3f6c8c" font-size="7" font-family="ui-monospace, 'SF Mono', Menlo, Consolas, monospace" letter-spacing="0.14em">HTTP API</text>
+<text x="784" y="330" fill="#1e1c19" font-size="12" font-weight="600" font-family="Inter, 'Helvetica Neue', Arial, sans-serif">Open-Meteo + NWS</text>
+<text x="784" y="344" fill="#6f6a62" font-size="9" font-family="ui-monospace, 'SF Mono', Menlo, Consolas, monospace">forecast · alerts</text>
+<line x1="24" y1="500" x2="936" y2="500" stroke="rgba(30,28,25,0.12)" stroke-width="0.8"/>
+<rect x="24" y="516" width="16" height="10" rx="2" fill="#f6e7e0" stroke="#b5543a" stroke-width="1"/>
+<text x="48" y="524" fill="#6f6a62" font-size="8" font-family="ui-monospace, 'SF Mono', Menlo, Consolas, monospace" letter-spacing="0.08em">FOCAL: THE AGENT LOOP</text>
+<rect x="193.6" y="516" width="16" height="10" rx="2" fill="#fffdf9" stroke="#1e1c19" stroke-width="1"/>
+<text x="217.6" y="524" fill="#6f6a62" font-size="8" font-family="ui-monospace, 'SF Mono', Menlo, Consolas, monospace" letter-spacing="0.08em">SERVICE</text>
+<rect x="284.79999999999995" y="516" width="16" height="10" rx="2" fill="#ebe4d6" stroke="#6f6a62" stroke-width="1"/>
+<text x="308.79999999999995" y="524" fill="#6f6a62" font-size="8" font-family="ui-monospace, 'SF Mono', Menlo, Consolas, monospace" letter-spacing="0.08em">STATE + DATA</text>
+<rect x="403.99999999999994" y="516" width="16" height="10" rx="2" fill="#fffdf9" stroke="#3f6c8c" stroke-width="1"/>
+<text x="427.99999999999994" y="524" fill="#6f6a62" font-size="8" font-family="ui-monospace, 'SF Mono', Menlo, Consolas, monospace" letter-spacing="0.08em">EXTERNAL SERVICE</text>
+<line x1="545.5999999999999" y1="521" x2="561.5999999999999" y2="521" stroke="#6f6a62" stroke-width="1" stroke-dasharray="4,3"/>
+<text x="569.5999999999999" y="524" fill="#6f6a62" font-size="8" font-family="ui-monospace, 'SF Mono', Menlo, Consolas, monospace" letter-spacing="0.08em">RETURN / READ-ONLY</text>
+</svg>

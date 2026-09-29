@@ -28,6 +28,25 @@ Dark mode follows the system setting and can be forced with `data-theme="dark"` 
 | [mockupworld.co](https://mockupworld.co) | Device mockups for README screenshots |
 | [latent-spaces/brag](https://github.com/latent-spaces/brag) | A short launch video of the finished app for the README (Claude Code skill; needs Node 22+ and FFmpeg) |
 
+## Motion (anime.js)
+anime.js v4 is loaded from cdnjs in `index.html`. The helpers in `static/app.js` are `enter()`
+(fade and rise with a stagger), `growBars()` (warmth bars grow from the left) and `countUp()` (clo numbers).
+They run only when content changes, and not at all with reduced motion or if the CDN fails.
+Currently animated: chat messages and tool calls, the day timeline, the outfit pieces and clo values, the closet on first load.
+
+## Component references (ideas, not code)
+[reactbits.dev](https://reactbits.dev) and [originkit.dev](https://www.originkit.dev) are React/Framer component
+libraries. Our app is plain HTML served by Python with no build step, so we don't install them; we pick an
+effect we like and rebuild it with anime.js and CSS. Good candidates:
+- a split-text reveal for the intro heading
+- a soft animated gradient behind the header that follows the weather (cold / rain / mild)
+- a subtle spotlight or tilt on closet cards on hover
+
+## Diagrams
+`docs/architecture.svg` follows [diagram-design](https://github.com/cathrynlavery/diagram-design)'s architecture type,
+skinned with the tokens above: one accent (the agent loop), right-angle connectors, labels on masks, legend strip at the bottom.
+Regenerate it with `python3 docs/make_architecture.py` after changing that script.
+
 ## Rules
 - Works at phone width: one column, 16px side padding, no sideways scrolling.
 - Tool calls stay visible above each answer (course requirement), collapsed by default.

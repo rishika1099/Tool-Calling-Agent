@@ -14,6 +14,8 @@ to class at 9, sit in class until 1, wait for the bus"), and Layer Lab:
 
 IEOR 4570 Project 1. Team: Rishika, Shreya, Kshamaa.
 
+![Layer Lab architecture: the browser posts to FastAPI on Cloud Run; the agent loop sends the conversation to Gemini and runs the tools it asks for, which use session state, clothing warmth tables, Open-Meteo and the National Weather Service](docs/architecture.svg)
+
 ## Sample queries
 
 1. `I walk 20 minutes to class at 9am, sit in class until 1, then wait 10 minutes for the bus. What should I wear?`
@@ -27,7 +29,8 @@ A demo closet is loaded in every new session, so these work without uploading an
 | Tool | Owner | What it does |
 |---|---|---|
 | `get_forecast_window` | shared | Hour-by-hour forecast for part of a day (Open-Meteo, external API) |
-| `plan_day_warmth` | Rishika | Clothing warmth needed per segment of the day, indoor vs outdoor, with a layering plan |
+| `get_weather_alerts` | shared | Active National Weather Service alerts, e.g. Wind Chill Advisory (external API, US only) |
+| `plan_day_warmth` | Rishika | Clothing warmth needed per segment of the day, indoor vs outdoor, with a layering plan and any active alerts |
 | `set_cold_sensitivity` | Rishika | Remembers whether the user runs cold, average or warm |
 | `build_outfit` | shared | Ranks outfits from the closet against the plan (warmth, rain, wind, occasion, laundry) |
 | `list_wardrobe` / `update_wardrobe` | shared | Shows the closet; marks items worn, clean or in the laundry |
@@ -65,6 +68,16 @@ Layer Lab gives clothing suggestions, not medical or safety advice.
 2. `gcloud auth application-default login`
 3. `uv run app.py`, then open http://localhost:8000
 
+## Tests
+
+- `uv run pytest`: offline checks of the warmth model (including the ISO 7730 PMV reference values) and the outfit builder.
+- `uv run python evals/tool_calls.py`: 10 real prompts through the agent, checking it calls the right tools in the right order (needs Gemini credentials).
+
+## Security
+
+Photos and anything read from them (care labels, printed text) are treated as data, never as instructions.
+Uploads are limited to images under 8 MB, kept in memory for the session only, and never logged or committed.
+
 ## Deploy
 
 Cloud Run with continuous deploy from this repo (course guide *Deploying to Cloud Run from GitHub*):
@@ -77,7 +90,9 @@ app.py              harness (tool-calling loop), sessions, /chat /upload /wardro
 session.py          per-session state: messages, closet, cold sensitivity, last plan, photos
 tools/              one module per tool area; each exports TOOLS and TOOL_MAP
 data/               garment clo values, fiber behavior, demo closet
-static/             frontend (index.html, style.css, app.js)
+static/             frontend (index.html, style.css, app.js; animations with anime.js)
+tests/, evals/      offline unit tests; tool-selection checks against the real model
+docs/               architecture diagram
 PROPOSAL.md         plan, features and who owns what
 DESIGN.md           visual direction and inspiration
 ```

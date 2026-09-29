@@ -15,8 +15,8 @@ then accounts for wind and walking pumping air through clothes.
 
 Indoors we use ASHRAE 55's PMV comfort model, assuming buildings are heated
 to about 72F on days when NYC's heat law applies (below 55F outside) and about
-75F otherwise:
-clo_ideal puts PMV at 0 (neutral), clo_min at -0.5 (edge of the comfort zone).
+75F otherwise. clo_ideal puts PMV at 0 (neutral), clo_min at -0.5 (edge of the
+comfort zone).
 You can check these values with the CBE Thermal Comfort Tool.
 
 Simplifications, documented in the README: radiant temperature equals air
@@ -29,6 +29,7 @@ import math
 
 import requests
 
+from .alerts import active_alerts
 from .forecast import ForecastError, hourly_for_day, to_f, to_mph
 
 MET = 58.2  # W/m2 per met
@@ -226,6 +227,7 @@ def plan_day_warmth(session, segments: list[dict], location: str = "New York", d
         "buildings_heated": heating_on,
         "segments": planned,
         "summary": summary,
+        "active_alerts": active_alerts(place),  # NWS, US only; None if unavailable
         "clo_guide": "t-shirt 0.08, thick sweater 0.36, jeans 0.24, wool coat 0.60, down parka 0.80",
     }
     session.last_plan = plan
