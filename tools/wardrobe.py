@@ -19,7 +19,7 @@ import secrets
 
 import litellm
 
-from settings import MODEL, VERTEX_LOCATION
+from settings import MODEL, MODEL_RETRIES, MODEL_TIMEOUT, VERTEX_LOCATION
 
 from .catalog import GARMENTS, MATERIALS, clo
 from .photos import PhotoError, as_data_uri, main_color
@@ -106,6 +106,8 @@ def analyze_garment(session, photo_id: str, label_photo_id: str | None = None) -
     reply = litellm.completion(
         model=MODEL,
         vertex_location=VERTEX_LOCATION,
+        timeout=MODEL_TIMEOUT,
+        num_retries=MODEL_RETRIES,
         messages=[{"role": "user", "content": content}],
         response_format={"type": "json_object"},
     ).choices[0].message.content

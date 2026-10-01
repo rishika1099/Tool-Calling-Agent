@@ -11,7 +11,7 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
 from session import BORROW, ESSENTIALS, Session, demo_wardrobe
-from settings import MODEL, VERTEX_LOCATION
+from settings import MODEL, MODEL_RETRIES, MODEL_TIMEOUT, VERTEX_LOCATION
 from tools import TOOLS, run_tool
 from tools.catalog import GARMENTS, MATERIALS, clo, slot, wear_limit
 from tools.photos import PhotoError, open_image
@@ -43,6 +43,8 @@ How to work:
 - If the plan has active_alerts (e.g. a Wind Chill Advisory), mention them first and lean warmer.
 
 How to answer:
+- Recommend the first option from build_outfit: it is ranked best and the page shows it as option 1.
+  Name every item in it. Mention option 2 or 3 only if the user asks for alternatives, by number.
 - Lead with the outfit in one line, then 2-4 short bullets: why it's warm enough, what to take off
   indoors, and any rain/wind warnings. Mention clo only briefly (e.g. "about 1.8 clo").
 - Refer to clothes by name, not id.
@@ -63,6 +65,8 @@ def run_agent(session: Session) -> tuple[str, list[dict]]:
         reply = litellm.completion(
             model=MODEL,
             vertex_location=VERTEX_LOCATION,
+            timeout=MODEL_TIMEOUT,
+            num_retries=MODEL_RETRIES,
             messages=messages,
             tools=TOOLS,
         ).choices[0].message
