@@ -25,8 +25,8 @@ Due **Wed Oct 7, 11:59pm**. Team: Rishika (rishika1099), Shreya (shreyashetty2),
 | Indoors vs outdoors, NYC heat-law indoor temperatures, transit = coat on | done |
 | Outfit builder: warmth, rain, wind, occasion formality, laundry | done |
 | Laundry: manual toggle in chat and closet panel | done |
-| Laundry: automatic wear limits per garment type | to do (Shreya) |
-| Add clothes from photos + care labels (`scan_garment`, Gemini vision) | done; Shreya to review, test on real photos and own |
+| Laundry: automatic wear limits per garment type | done |
+| Add clothes from photos + care labels (`scan_garment`, Gemini vision) | done; reviewed and tested by Shreya |
 | Onboarding: bedroom-window intro, Step 1 "Build your digital closet", demo closet option | done |
 | Style: color, shape, pattern, occasion rules | to do (Kshamaa) |
 | Motion with anime.js: timeline, outfit, closet, chat | first pass done |
@@ -49,7 +49,9 @@ Each person owns one **original tool** (the course requires one per team member)
 
 ### Shreya: wardrobe
 - **Original tool:** `scan_garment` (`tools/wardrobe.py`): garment photo + care label photo, then Gemini vision gives type, fiber mix, fit, formality; Pillow measures the color; the item is saved to the session closet. The spec is in the file.
-- Automatic laundry tracking: wear limits per garment type.
+- Automatic laundry tracking: wear limits per garment type (`garments.csv`'s `wear_limit` column,
+  `tools/catalog.wear_limit`). `update_wardrobe` sends an item to the laundry on its own once a
+  `"worn"` update reaches that limit (a t-shirt after 1 wear, jeans after 5, a coat after 10).
 - Sample garment and care-label photos in `data/demo_photos/` so graders can test scanning.
 
 ### Kshamaa: style + design

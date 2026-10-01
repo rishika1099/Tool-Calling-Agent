@@ -13,7 +13,7 @@ from pydantic import BaseModel
 from session import BORROW, ESSENTIALS, Session, demo_wardrobe
 from settings import MODEL, VERTEX_LOCATION
 from tools import TOOLS, run_tool
-from tools.catalog import GARMENTS, MATERIALS, clo, slot
+from tools.catalog import GARMENTS, MATERIALS, clo, slot, wear_limit
 from tools.photos import PhotoError, open_image
 from tools.wardrobe import FITS, PATTERNS, RAIN, GarmentScanError, add_item, analyze_garment
 from tools.forecast import current_conditions
@@ -34,7 +34,9 @@ How to work:
 - If the user doesn't give times, assume a typical class day and say what you assumed.
   Default location is New York and default day is today.
 - If the user says they run cold or warm, call set_cold_sensitivity, then re-plan.
-- If they say an item is in the wash, call update_wardrobe with 'in_laundry'.
+- If they say an item is in the wash, call update_wardrobe with 'in_laundry'. Once they confirm they're
+  wearing an outfit, call update_wardrobe with 'worn' for those items; items that hit their wear limit
+  go to the laundry automatically, so mention that if the tool result's 'note' says so.
 - Photo ids like img_ab12cd in a message are uploaded photos. Clothing photos go to scan_garment,
   a full-body photo of the user is for try_on_outfit (only when they ask to see it).
 - Use style_check when they ask if things go together.
@@ -191,7 +193,7 @@ def clear(session_id: str | None = None):
 def wardrobe(session_id: str | None = None):
     """The closet, profile and last plan, for the side panels of the page."""
     session_id, session = get_session(session_id)
-    items = [{**item, "slot": slot(item), "clo": clo(item)} for item in session.wardrobe.values()]
+    items = [{**item, "slot": slot(item), "clo": clo(item), "wear_limit": wear_limit(item)} for item in session.wardrobe.values()]
     return {
         "session_id": session_id,
         "items": items,
@@ -263,7 +265,7 @@ def wardrobe_add(request: ItemRequest):
         item = add_item(session, request.item)
     except (GarmentScanError, PhotoError) as e:
         raise HTTPException(422, str(e))
-    return {**item, "slot": slot(item), "clo": clo(item)}
+    return {**item, "slot": slot(item), "clo": clo(item), "wear_limit": wear_limit(item)}
 
 
 @app.delete("/wardrobe/item")

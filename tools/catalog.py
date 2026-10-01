@@ -1,7 +1,9 @@
 """Garment and material reference data, loaded once from data/*.csv.
 
 garments.csv gives each garment type its warmth in clo (ASHRAE 55 where
-available, marked "estimate" otherwise). materials.csv says how each fiber
+available, marked "estimate" otherwise) and a wear_limit: how many times it
+can be worn before it needs washing (team estimate, e.g. a t-shirt is 1,
+a pair of jeans is 5, a coat is 10). materials.csv says how each fiber
 behaves when wet or windy. These are team estimates; see the README.
 """
 
@@ -38,6 +40,11 @@ def slot(item: dict) -> str:
 
 def clo(item: dict) -> float:
     return float(GARMENTS[item["garment_type"]]["clo"])
+
+
+def wear_limit(item: dict) -> int:
+    """Wears before this garment type needs washing."""
+    return int(GARMENTS[item["garment_type"]]["wear_limit"])
 
 
 def wet_retention(item: dict) -> float:

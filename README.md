@@ -39,8 +39,8 @@ A demo closet is loaded in every new session, so these work without uploading an
 | `plan_day_warmth` | Rishika | Clothing warmth needed per segment of the day, indoor vs outdoor, with a layering plan and any active alerts |
 | `set_cold_sensitivity` | Rishika | Remembers whether the user runs cold, average or warm |
 | `build_outfit` | shared | Ranks outfits from the closet against the plan (warmth, rain, wind, occasion, laundry) |
-| `list_wardrobe` / `update_wardrobe` | shared | Shows the closet; marks items worn, clean or in the laundry |
-| `scan_garment` | Shreya | Adds clothes from a photo with Gemini vision, reading the care label for the exact fiber mix; every field is validated against fixed lists |
+| `list_wardrobe` / `update_wardrobe` | shared | Shows the closet; marks items worn, clean or in the laundry. A worn item past its wear limit (Shreya, per garment type in `garments.csv`) goes to the laundry automatically |
+| `scan_garment` | Shreya | Adds clothes from a photo with Gemini vision, reading the care label for the exact fiber mix; every field is validated against fixed lists. Sample photos: `data/demo_photos/` |
 | `style_check` | Kshamaa | Scores whether an outfit goes together: color, shape, pattern, occasion *(in progress)* |
 | `try_on_outfit` | bonus | Shows the user wearing the outfit (Vertex AI) *(in progress)* |
 
@@ -99,7 +99,7 @@ buildpack, entrypoint `uvicorn app:app --host 0.0.0.0 --port $PORT`, IAP restric
 app.py              harness (tool-calling loop), sessions, /chat /upload /wardrobe endpoints
 session.py          per-session state: messages, closet, cold sensitivity, last plan, photos
 tools/              one module per tool area; each exports TOOLS and TOOL_MAP
-data/               garment clo values, fiber behavior, demo closet
+data/               garment clo values, wear limits, fiber behavior, demo closet, sample scan photos
 static/             frontend: index.html, style.css, app.js (anime.js), sky.js (live weather sky)
 tests/, evals/      offline unit tests; tool-selection checks against the real model
 docs/               architecture diagram
