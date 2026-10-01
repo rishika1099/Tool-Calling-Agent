@@ -2,6 +2,7 @@
 
 import io
 import json
+from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
@@ -135,6 +136,31 @@ def test_scan_endpoint_reports_model_outage(monkeypatch):
     up = client.post("/upload", data={"session_id": sid}, files={"file": ("s.jpg", photo(), "image/jpeg")}).json()
     res = client.post("/wardrobe/scan", json={"session_id": sid, "photo_id": up["image_id"]})
     assert res.status_code == 502 and "by hand" in res.json()["detail"]
+
+
+DEMO_PHOTOS = Path(__file__).parent.parent / "data" / "demo_photos"
+
+
+@pytest.mark.parametrize("slug, garment_type, materials", [
+    ("sweater", "sweater_thick", {"wool": 70, "nylon": 30}),
+    ("tshirt", "t_shirt", {"cotton": 100}),
+    ("jeans", "jeans", {"cotton": 98, "elastane": 2}),
+])
+def test_demo_photos_are_valid_and_scannable(monkeypatch, slug, garment_type, materials):
+    """The sample photos in data/demo_photos/ (for graders) load and scan end to end."""
+    garment_bytes = (DEMO_PHOTOS / f"{slug}.jpg").read_bytes()
+    label_bytes = (DEMO_PHOTOS / f"{slug}_label.jpg").read_bytes()
+    reply = {"is_clothing": True, "name": slug, "garment_type": garment_type, "fit": "relaxed",
+             "pattern": "solid", "formality": 1, "materials": materials, "materials_source": "label",
+             "rain_protection": "none", "windproof": False}
+    fake_gemini(monkeypatch, reply)
+    session, (garment, label) = session_with_photos(garment_bytes, label_bytes)
+    result = json.loads(run_tool("scan_garment", {"photo_id": garment, "label_photo_id": label}, session))
+    item = session.wardrobe[result["added"]["id"]]
+    assert item["garment_type"] == garment_type
+    assert item["materials"] == materials
+    assert result["materials_from"] == "label"
+    assert item["color"].startswith("#")
 
 
 def test_closet_setup_starts_empty_and_borrows_missing_basics():

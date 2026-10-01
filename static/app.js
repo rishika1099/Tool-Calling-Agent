@@ -330,7 +330,8 @@ function renderCloset(selectedIds) {
         const btn = document.createElement("button");
         btn.className = `item ${item.status}${selectedIds.includes(item.id) ? " selected" : ""}${item.photo_id ? " has-photo" : ""}`;
         btn.dataset.id = item.id;
-        btn.title = `${item.name}: ${item.status.replace("_", " ")}. Tap to toggle laundry.`;
+        const wearNote = item.wear_limit ? ` · worn ${item.wears}/${item.wear_limit}` : "";
+        btn.title = `${item.name}: ${item.status.replace("_", " ")}${wearNote}. Tap to toggle laundry.`;
         const visual = item.photo_id ? `<img class="photo" src="${photoUrl(item.photo_id)}" alt="">` : garmentSvg(item);
         btn.innerHTML = `${visual}<div>${escapeHtml(item.name)}</div><span class="clo">${item.clo} clo</span>`;
         btn.addEventListener("click", () => toggleLaundry(item, btn));

@@ -8,7 +8,7 @@ import itertools
 import json
 
 from . import style
-from .catalog import INDOOR_SLOTS, clo, is_windproof, keeps_rain_out, slot, wet_retention
+from .catalog import INDOOR_SLOTS, clo, is_windproof, keeps_rain_out, slot, wear_limit, wet_retention
 
 UNDERWEAR_CLO = 0.04  # assumed, not tracked in the closet
 OCCASIONS = {"everyday": 1, "class": 1, "date": 2, "dinner": 2, "party": 2, "work": 2, "interview": 3}  # minimum formality
@@ -182,7 +182,8 @@ def build_outfit(session, occasion: str = "class", must_include: list[str] | Non
 def list_wardrobe(session, slot_filter: str | None = None) -> str:
     """Compact view of the closet so the model can refer to item ids."""
     items = [
-        {"id": i["id"], "name": i["name"], "slot": slot(i), "clo": clo(i), "status": i["status"], "wears": i["wears"]}
+        {"id": i["id"], "name": i["name"], "slot": slot(i), "clo": clo(i), "status": i["status"],
+         "wears": i["wears"], "wear_limit": wear_limit(i)}
         for i in session.wardrobe.values()
         if slot_filter in (None, slot(i))
     ]
@@ -190,20 +191,33 @@ def list_wardrobe(session, slot_filter: str | None = None) -> str:
 
 
 def update_wardrobe(session, item_ids: list[str], status: str) -> str:
-    """Mark items clean, worn, or in the laundry."""
+    """Mark items clean, worn, or in the laundry. A 'worn' item that reaches its wear limit
+    (garments.csv, e.g. a t-shirt is 1, a coat is 10) goes to the laundry automatically."""
     if status not in STATUSES:
         return json.dumps({"error": f"status must be one of {STATUSES}."})
     unknown = [i for i in item_ids if i not in session.wardrobe]
     if unknown:
         return json.dumps({"error": f"Unknown item ids {unknown}. Call list_wardrobe to see valid ids."})
+    updated, needs_laundry = [], []
     for item_id in item_ids:
         item = session.wardrobe[item_id]
-        item["status"] = status
         if status == "worn":
             item["wears"] += 1
+            if item["wears"] >= wear_limit(item):
+                item["status"] = "in_laundry"
+                needs_laundry.append(item["name"])
+            else:
+                item["status"] = "worn"
         elif status == "clean":
             item["wears"] = 0
-    return json.dumps({"updated": [{"id": i, "name": session.wardrobe[i]["name"], "status": status} for i in item_ids]})
+            item["status"] = "clean"
+        else:
+            item["status"] = status
+        updated.append({"id": item_id, "name": item["name"], "status": item["status"], "wears": item["wears"]})
+    result = {"updated": updated}
+    if needs_laundry:
+        result["note"] = f"{', '.join(needs_laundry)} hit the wear limit and went straight to the laundry."
+    return json.dumps(result)
 
 
 _SLOTS = ["base_top", "mid_top", "outer", "bottom", "one_piece", "legwear", "socks", "shoes", "head", "hands", "neck"]
@@ -252,7 +266,9 @@ TOOLS = [
             "name": "update_wardrobe",
             "description": (
                 "Change the status of closet items. Use 'in_laundry' when the user says something is in the wash, "
-                "'worn' after they choose an outfit, 'clean' when laundry is done."
+                "'worn' after they choose an outfit, 'clean' when laundry is done. A 'worn' item that reaches its "
+                "wear limit (e.g. a t-shirt after 1 wear, a coat after 10) is sent to the laundry automatically; "
+                "the result's 'note' field says which items that happened to."
             ),
             "parameters": {
                 "type": "object",
