@@ -1104,9 +1104,14 @@ function runPortal(setupDone) {
         document.removeEventListener("keydown", onKey);
         const ready = startMode(mode);
         if (A) {
-            A.animate(".portal-top, .portal-copy, .portal-foot, .lamp-light", { opacity: 0, translateY: -14, duration: 380, ease: "inQuad" });
             scene.style.transform = "";
-            await A.animate(scene, { scale: 14, duration: 1300, delay: 120, ease: "inOutExpo" });
+            // The text, frame, pane dividers, curtains and sill fade away first, so only a clean
+            // opening onto the sky grows, not giant white bars.
+            const fading = portal.querySelectorAll(".portal-top, .portal-copy, .portal-foot, .lamp-light, .frame, .muntin, .glare, .sill, .curtain, .rod");
+            A.utils?.remove?.(fading);  // stop the intro's own animations on these
+            A.animate(fading, { opacity: 0, duration: 300, ease: "outQuad",
+                onComplete: () => fading.forEach((el) => { el.style.opacity = "0"; }) });
+            await A.animate(scene, { scale: 16, duration: 1200, delay: 300, ease: "inOutQuart" });
         }
         await ready;
         portal.remove();
