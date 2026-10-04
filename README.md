@@ -42,7 +42,7 @@ A demo closet is loaded in every new session, so these work without uploading an
 | `build_outfit` | shared | Ranks outfits from the closet against the plan (warmth, rain, wind, occasion, laundry) |
 | `list_wardrobe` / `update_wardrobe` | shared | Shows the closet; marks items worn, clean or in the laundry. A worn item past its wear limit (Shreya, per garment type in `garments.csv`) goes to the laundry automatically |
 | `scan_garment` | Shreya | Adds clothes from a photo with Gemini vision, reading the care label for the exact fiber mix; every field is validated against fixed lists. Sample photos: `data/demo_photos/` |
-| `style_check` | Kshamaa | Scores whether an outfit goes together: color, shape, pattern, occasion *(in progress)* |
+| `style_check` | Kshamaa | Scores whether an outfit goes together: color, shape, pattern, occasion |
 | `try_on_outfit` | bonus | Shows the user wearing the outfit (Vertex AI) *(in progress)* |
 
 Every `/chat` response returns `response`, `session_id` and `tool_calls` (name, args, result),
