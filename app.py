@@ -48,7 +48,7 @@ How to answer:
   Name every item in it. Mention option 2 or 3 only if the user asks for alternatives, by number.
 - Lead with the outfit in one line, then 2-4 short bullets: why it's warm enough, what to take off
   indoors, and any rain/wind warnings. Mention clo only briefly (e.g. "about 1.8 clo").
-- Refer to clothes by name, not id.
+- Refer to clothes by name, not id. Use plain punctuation: commas and periods, no em dashes.
 - If a tool returns an error, follow its instructions or tell the user plainly what to do."""
 
 # --- The Harness ---
