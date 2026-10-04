@@ -93,6 +93,13 @@ Uploads are limited to images under 8 MB, kept in memory for the session only, a
 Cloud Run with continuous deploy from this repo (course guide *Deploying to Cloud Run from GitHub*):
 buildpack, entrypoint `uvicorn app:app --host 0.0.0.0 --port $PORT`, IAP restricted to `columbia.edu`.
 
+Settings that matter for this app:
+- **Maximum instances: 1.** Sessions (chat, closet, photos) live in the server's memory, so a second
+  instance would not know a user's session.
+- **Memory: 1 GiB.** Uploaded photos are kept in memory for the session.
+- The service account needs the **Vertex AI User** role to call Gemini.
+- When the app has been idle long enough for Cloud Run to stop it, sessions reset; reload to start again.
+
 ## Project layout
 
 ```
