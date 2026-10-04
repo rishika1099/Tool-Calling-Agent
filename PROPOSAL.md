@@ -34,7 +34,7 @@ Due **Wed Oct 7, 11:59pm**. Team: Rishika (rishika1099), Shreya (shreyashetty2),
 | Offline tests (`uv run pytest`) and tool-selection evals | done (run evals once credentials are set up) |
 | Architecture diagram in the README | done |
 | Deploy to Cloud Run | to do (Rishika) |
-| Comfort feedback ("I was freezing") adjusts future plans | bonus (Rishika) |
+| Comfort feedback ("I was freezing") adjusts future plans | done |
 | Try-on image (Vertex AI) | bonus (Rishika) |
 | Launch video with /brag | last day (Kshamaa) |
 

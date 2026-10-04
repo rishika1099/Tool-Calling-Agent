@@ -243,6 +243,27 @@ def set_cold_sensitivity(session, level: str) -> str:
                        "note": "Call plan_day_warmth again so the plan uses the new setting."})
 
 
+FEEDBACK_STEP = {"too_cold": 0.1, "just_right": 0.0, "too_warm": -0.1}  # clo per report, team estimate
+FEEDBACK_CAP = 0.3
+
+
+def record_comfort_feedback(session, feeling: str) -> str:
+    """Learn from how an outfit actually felt: nudge future plans warmer or cooler."""
+    if feeling not in FEEDBACK_STEP:
+        return json.dumps({"error": f"feeling must be one of {list(FEEDBACK_STEP)}."})
+    session.comfort_offset = round(max(-FEEDBACK_CAP, min(FEEDBACK_CAP, session.comfort_offset + FEEDBACK_STEP[feeling])), 2)
+    total = round(SENSITIVITY_OFFSET[session.cold_sensitivity] + session.comfort_offset, 2)
+    at_cap = abs(session.comfort_offset) >= FEEDBACK_CAP and feeling != "just_right"
+    return json.dumps({
+        "feeling": feeling,
+        "learned_adjustment_clo": session.comfort_offset,
+        "total_personal_adjustment_clo": total,
+        "note": ("That is the largest adjustment feedback can make; suggest the 'I run cold / warm' setting too. "
+                 if at_cap else "") + "Future plans will ask for this much more (or less) clothing. "
+                "Call plan_day_warmth again if the user wants a new outfit now.",
+    })
+
+
 TOOLS = [
     {
         "type": "function",
@@ -299,4 +320,25 @@ TOOLS = [
     },
 ]
 
-TOOL_MAP = {"plan_day_warmth": plan_day_warmth, "set_cold_sensitivity": set_cold_sensitivity}
+TOOLS.append({
+    "type": "function",
+    "function": {
+        "name": "record_comfort_feedback",
+        "description": (
+            "Record how an outfit actually felt after the user wore it, so future plans adapt: each 'too_cold' "
+            "asks for 0.1 clo more next time, each 'too_warm' 0.1 less (up to 0.3 either way). Use when the user "
+            "reports on a past outfit, e.g. 'I was freezing in that yesterday' or 'that was perfect'. "
+            "For a general trait ('I always run cold') use set_cold_sensitivity instead."
+        ),
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "feeling": {"type": "string", "enum": list(FEEDBACK_STEP), "description": "How the outfit felt overall."},
+            },
+            "required": ["feeling"],
+        },
+    },
+})
+
+TOOL_MAP = {"plan_day_warmth": plan_day_warmth, "set_cold_sensitivity": set_cold_sensitivity,
+            "record_comfort_feedback": record_comfort_feedback}

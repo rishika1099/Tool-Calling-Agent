@@ -48,6 +48,8 @@ CASES = [
      lambda c: names(c) == []),
     ("What should I wear for a 15 minute walk to dinner in Boston tonight at 7?",
      lambda c: any("boston" in str(x["args"].get("location", "")).lower() for x in c if x["name"] == "plan_day_warmth")),
+    ("I wore what you suggested yesterday and I was freezing the whole walk.",
+     lambda c: any(x["name"] == "record_comfort_feedback" and x["args"].get("feeling") == "too_cold" for x in c)),
     ("I'm biking to work tomorrow at 8am, about 25 minutes. What should I wear?",
      lambda c: segment_has(c, "activity", "biking")),
 ]

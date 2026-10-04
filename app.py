@@ -34,6 +34,7 @@ How to work:
 - If the user doesn't give times, assume a typical class day and say what you assumed.
   Default location is New York and default day is today.
 - If the user says they run cold or warm, call set_cold_sensitivity, then re-plan.
+- If they report how a past outfit felt ("I was freezing yesterday"), call record_comfort_feedback.
 - If they say an item is in the wash, call update_wardrobe with 'in_laundry'. Once they confirm they're
   wearing an outfit, call update_wardrobe with 'worn' for those items; items that hit their wear limit
   go to the laundry automatically, so mention that if the tool result's 'note' says so.

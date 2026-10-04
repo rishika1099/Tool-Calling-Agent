@@ -68,7 +68,7 @@ node(24, 164, 136, 64, "BROWSER", "Layer Lab page", "static/ · anime.js", strok
 node(228, 164, 140, 64, "FASTAPI", "Endpoints", "/chat · /upload")
 node(424, 164, 140, 64, "HARNESS", "Agent loop", "run_agent()", fill=ACCENT_TINT, stroke=ACCENT)
 node(228, 292, 140, 64, "STATE", "Session", "closet, plan, photos", fill=PAPER2, stroke=MUTED)
-node(424, 292, 140, 64, "TOOLS · 10", "Warmth + outfit", "tools/*.py")
+node(424, 292, 140, 64, "TOOLS · 11", "Warmth + outfit", "tools/*.py")
 node(424, 404, 140, 56, "DATA", "Clo tables", "data/*.csv", fill=PAPER2, stroke=MUTED)
 node(772, 164, 164, 64, "VERTEX AI", "Gemini", "gemini-3.5-flash-lite", stroke=LINK)
 node(772, 292, 164, 64, "HTTP API", "Open-Meteo + NWS", "forecast · alerts", stroke=LINK)

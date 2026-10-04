@@ -38,6 +38,7 @@ A demo closet is loaded in every new session, so these work without uploading an
 | `get_weather_alerts` | shared | Active National Weather Service alerts, e.g. Wind Chill Advisory (external API, US only) |
 | `plan_day_warmth` | Rishika | Clothing warmth needed per segment of the day, indoor vs outdoor, with a layering plan and any active alerts |
 | `set_cold_sensitivity` | Rishika | Remembers whether the user runs cold, average or warm |
+| `record_comfort_feedback` | Rishika | Learns from how an outfit felt ("I was freezing"): nudges future plans 0.1 clo warmer or cooler, up to 0.3 |
 | `build_outfit` | shared | Ranks outfits from the closet against the plan (warmth, rain, wind, occasion, laundry) |
 | `list_wardrobe` / `update_wardrobe` | shared | Shows the closet; marks items worn, clean or in the laundry. A worn item past its wear limit (Shreya, per garment type in `garments.csv`) goes to the laundry automatically |
 | `scan_garment` | Shreya | Adds clothes from a photo with Gemini vision, reading the care label for the exact fiber mix; every field is validated against fixed lists. Sample photos: `data/demo_photos/` |
@@ -81,7 +82,7 @@ The animated sky ports the WebGL shader from [Originkit](https://www.originkit.d
 ## Tests
 
 - `uv run pytest`: offline checks of the warmth model (including the ISO 7730 PMV reference values) and the outfit builder.
-- `uv run python evals/tool_calls.py`: 10 real prompts through the agent, checking it calls the right tools in the right order (needs Gemini credentials).
+- `uv run python evals/tool_calls.py`: 11 real prompts through the agent, checking it calls the right tools in the right order (needs Gemini credentials).
 
 ## Security
 

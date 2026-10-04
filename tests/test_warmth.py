@@ -110,3 +110,17 @@ def test_errors_tell_the_model_what_to_fix(cold_day, args, fragment):
 def test_build_outfit_needs_a_plan_first():
     _, session = get_session(None)
     assert "plan_day_warmth" in json.loads(run_tool("build_outfit", {}, session))["error"]
+
+
+def test_comfort_feedback_nudges_future_plans_and_caps(cold_day):
+    _, session = get_session(None)
+    base = plan(session)["summary"]["outdoor_clo_ideal"]
+    result = json.loads(run_tool("record_comfort_feedback", {"feeling": "too_cold"}, session))
+    assert result["learned_adjustment_clo"] == 0.1
+    assert plan(session)["summary"]["outdoor_clo_ideal"] == pytest.approx(base + 0.1, abs=0.011)
+    for _ in range(5):
+        result = json.loads(run_tool("record_comfort_feedback", {"feeling": "too_cold"}, session))
+    assert result["learned_adjustment_clo"] == 0.3 and "largest adjustment" in result["note"]
+    run_tool("record_comfort_feedback", {"feeling": "too_warm"}, session)
+    assert session.comfort_offset == 0.2
+    assert "feeling must be" in json.loads(run_tool("record_comfort_feedback", {"feeling": "meh"}, session))["error"]

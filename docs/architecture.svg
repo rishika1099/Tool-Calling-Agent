@@ -54,7 +54,7 @@
 <text x="240" y="344" fill="#6f6a62" font-size="9" font-family="ui-monospace, 'SF Mono', Menlo, Consolas, monospace">closet, plan, photos</text>
 <rect x="424" y="292" width="140" height="64" rx="6" fill="#fffdf9" stroke="#1e1c19" stroke-width="1"/>
 <rect x="436" y="302" width="61" height="12" rx="2" fill="none" stroke="#1e1c19" stroke-width="0.8"/>
-<text x="440" y="311" fill="#1e1c19" font-size="7" font-family="ui-monospace, 'SF Mono', Menlo, Consolas, monospace" letter-spacing="0.14em">TOOLS · 10</text>
+<text x="440" y="311" fill="#1e1c19" font-size="7" font-family="ui-monospace, 'SF Mono', Menlo, Consolas, monospace" letter-spacing="0.14em">TOOLS · 11</text>
 <text x="436" y="330" fill="#1e1c19" font-size="12" font-weight="600" font-family="Inter, 'Helvetica Neue', Arial, sans-serif">Warmth + outfit</text>
 <text x="436" y="344" fill="#6f6a62" font-size="9" font-family="ui-monospace, 'SF Mono', Menlo, Consolas, monospace">tools/*.py</text>
 <rect x="424" y="404" width="140" height="56" rx="6" fill="#ebe4d6" stroke="#6f6a62" stroke-width="1"/>
