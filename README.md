@@ -20,6 +20,8 @@ skip straight to the chat with "or try it with a demo closet".
 
 IEOR 4570 Project 1. Team: Rishika, Shreya, Kshamaa.
 
+**Live app:** https://layer-lab-635182820659.us-east1.run.app (sign in with a Columbia account)
+
 ![Layer Lab architecture: the browser posts to FastAPI on Cloud Run; the agent loop sends the conversation to Gemini and runs the tools it asks for, which use session state, clothing warmth tables, Open-Meteo and the National Weather Service](docs/architecture.svg)
 
 ## Sample queries
