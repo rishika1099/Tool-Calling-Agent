@@ -221,11 +221,18 @@ def clear(session_id: str | None = None):
     return {"status": "ok"}
 
 
+def item_view(session_id: str, item: dict) -> dict:
+    """An item as the page needs it: slot, warmth, wear limit, and where its photo lives (if any)."""
+    photo = (f"/image/{session_id}/{item['photo_id']}" if item.get("photo_id")
+             else f"/static/{item['photo']}" if item.get("photo") else None)
+    return {**item, "slot": slot(item), "clo": clo(item), "wear_limit": wear_limit(item), "photo_url": photo}
+
+
 @app.get("/wardrobe")
 def wardrobe(session_id: str | None = None):
     """The closet, profile and last plan, for the side panels of the page."""
     session_id, session = get_session(session_id)
-    items = [{**item, "slot": slot(item), "clo": clo(item), "wear_limit": wear_limit(item)} for item in session.wardrobe.values()]
+    items = [item_view(session_id, item) for item in session.wardrobe.values()]
     return {
         "session_id": session_id,
         "items": items,
@@ -297,7 +304,7 @@ def wardrobe_add(request: ItemRequest):
         item = add_item(session, request.item)
     except (GarmentScanError, PhotoError) as e:
         raise HTTPException(422, str(e))
-    return {**item, "slot": slot(item), "clo": clo(item), "wear_limit": wear_limit(item)}
+    return item_view(request.session_id, item)
 
 
 @app.delete("/wardrobe/item")

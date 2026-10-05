@@ -347,11 +347,11 @@ function renderCloset(selectedIds) {
         const cell = document.createElement("div");
         cell.className = "item-cell";
         const btn = document.createElement("button");
-        btn.className = `item ${item.status}${selectedIds.includes(item.id) ? " selected" : ""}${item.photo_id ? " has-photo" : ""}`;
+        btn.className = `item ${item.status}${selectedIds.includes(item.id) ? " selected" : ""}${item.photo_url ? " has-photo" : ""}`;
         btn.dataset.id = item.id;
         const wearNote = item.wear_limit ? ` · worn ${item.wears}/${item.wear_limit}` : "";
         btn.title = `${item.name}: ${item.status.replace("_", " ")}${wearNote}. Tap to toggle laundry.`;
-        const visual = item.photo_id ? `<img class="photo" src="${photoUrl(item.photo_id)}" alt="">` : garmentSvg(item);
+        const visual = item.photo_url ? `<img class="photo" src="${item.photo_url}" alt="" loading="lazy">` : garmentSvg(item);
         btn.innerHTML = `${visual}<div>${escapeHtml(item.name)}</div><span class="clo">${item.clo} clo</span>`;
         btn.addEventListener("click", () => toggleLaundry(item, btn));
         attachSpotlight(btn, 14);
@@ -481,9 +481,9 @@ function carousel(options, byId) {
         const stripes = worn.map((x) => `<i style="background:${byId[x.id]?.color || "#ccc"};flex:${(x.clo + 0.08).toFixed(2)}"></i>`).join("");
         const key = ["outer", "mid_top", "one_piece", "base_top", "bottom", "shoes"]
             .map((sl) => o.items.find((x) => x.slot === sl)).filter(Boolean).slice(0, 4);
-        const collage = key.some((x) => byId[x.id]?.photo_id)
-            ? `<span class="fc-collage n${key.length}" aria-hidden="true">${key.map((x) => byId[x.id]?.photo_id
-                ? `<img src="${photoUrl(byId[x.id].photo_id)}" alt="">`
+        const collage = key.some((x) => byId[x.id]?.photo_url)
+            ? `<span class="fc-collage n${key.length}" aria-hidden="true">${key.map((x) => byId[x.id]?.photo_url
+                ? `<img src="${byId[x.id].photo_url}" alt="">`
                 : `<span style="background:${byId[x.id]?.color || "#ccc"}">${garmentSvg({ ...byId[x.id], slot: x.slot })}</span>`).join("")}</span>`
             : "";
         return `<button class="fc-card${i === optionIndex ? " is-focus" : ""}" data-i="${i}" aria-pressed="${i === optionIndex}"
@@ -526,7 +526,7 @@ function renderOptionDetail(animate) {
     const extras = option.items.filter((i) => !STACK_ORDER.includes(i.slot));
     const layers = worn.map((i) => {
         const color = byId[i.id]?.color || "#cccccc";
-        const thumb = byId[i.id]?.photo_id ? `<img class="lthumb" src="${photoUrl(byId[i.id].photo_id)}" alt="">` : "";
+        const thumb = byId[i.id]?.photo_url ? `<img class="lthumb" src="${byId[i.id].photo_url}" alt="">` : "";
         return `<div class="layer" style="--c:${color};--on:${textOn(color)};min-height:${Math.round(26 + i.clo * 46)}px">
             ${thumb}${escapeHtml(i.name)}<span class="slot">${SLOT_LABEL[i.slot]}</span><small>${i.clo}</small></div>`;
     }).join("");

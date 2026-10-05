@@ -33,7 +33,8 @@ IEOR 4570 Project 1. Team: Rishika, Shreya, Kshamaa.
 2. `I always feel cold. Is my grey hoodie enough for a 15 minute walk tonight at 7?`
 3. `My jeans are in the wash. I have an interview downtown tomorrow at 10: a 10 minute walk, 30 minutes on the subway, then an hour indoors.`
 
-A demo closet is loaded in every new session, so these work without uploading anything.
+A demo closet of 27 pieces is loaded in every new session, so these work without uploading anything.
+21 of them are real photos of people's own clothes from the CC0 [Clothing dataset](https://github.com/alexeygrigorev/clothing-dataset).
 
 ## Tools
 
@@ -82,6 +83,8 @@ Layer Lab gives clothing suggestions, not medical or safety advice.
 
 ## Credits
 
+The demo closet's photos come from the [Clothing dataset](https://github.com/alexeygrigorev/clothing-dataset)
+by Alexey Grigorev and contributors (CC0 1.0, public domain); the image ids are listed in `static/closet/SOURCE.md`.
 The animated sky ports the WebGL shader from [Originkit](https://www.originkit.dev)'s Cloud Sky component. Several UI effects are plain-JS versions of [React Bits](https://reactbits.dev) components (see DESIGN.md). Motion by [anime.js](https://animejs.com).
 
 ## Tests
@@ -116,6 +119,7 @@ app.py              harness (tool-calling loop), sessions, /chat /upload /wardro
 session.py          per-session state: messages, closet, cold sensitivity, last plan, photos
 tools/              one module per tool area; each exports TOOLS and TOOL_MAP
 data/               garment clo values, wear limits, fiber behavior, demo closet, sample scan photos
+static/closet/      demo closet photos (CC0 Clothing dataset; see SOURCE.md)
 static/             frontend: index.html, style.css, app.js (anime.js), sky.js (live weather sky)
 tests/, evals/      offline unit tests; tool-selection checks against the real model
 docs/               architecture diagram

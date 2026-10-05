@@ -1,8 +1,9 @@
 """Show the user wearing an outfit: one generated image from their photo and the outfit.
 
-One call to a Gemini image model does the whole outfit. Clothes the user photographed are
-passed as reference images, so the preview shows their actual garment; demo closet items
-have no photo and are described in words. The user's face, pose and background are kept.
+One call to a Gemini image model does the whole outfit. Every garment that has a photo
+(the user's own uploads, or the demo closet's photos) is passed as a reference image, so
+the preview shows the actual garment; items without one are described in words. The
+user's face, pose and background are kept.
 
 The result is stored in the session and returned as a URL; image bytes never go into a
 tool result. It is a preview, not a fitting: colors and fit are approximate, and warmth
@@ -19,7 +20,7 @@ from google.genai import types
 
 from settings import VERTEX_LOCATION
 
-from .catalog import slot
+from .catalog import DATA, slot
 from .photos import PhotoError, open_image
 
 IMAGE_MODEL = "gemini-3.1-flash-image"
@@ -62,6 +63,16 @@ def _jpeg(data: bytes) -> bytes:
     return buf.getvalue()
 
 
+def _garment_photo(session, item: dict) -> bytes | None:
+    """The item's photo, from the user's uploads or the demo closet's files."""
+    if item.get("photo_id") in session.images:
+        return session.images[item["photo_id"]][0]
+    if item.get("photo"):
+        path = DATA.parent / "static" / item["photo"]
+        return path.read_bytes() if path.is_file() else None
+    return None
+
+
 def _generate(parts: list) -> bytes:
     """Call the image model with text and image parts; return the edited image's bytes."""
     _, project = google.auth.default()
@@ -102,12 +113,12 @@ def try_on_outfit(session, item_ids: list[str] | None = None, person_photo_id: s
     items.sort(key=lambda i: order.get(slot(i), 99))
     try:
         parts: list = [_jpeg(session.images[person_photo_id][0])]
-        lines, from_photos = [], []
+        lines, from_photos = [], []  # from_photos: items shown from a real photo, not just their name
         for item in items:
             wear = how.get(slot(item), "")
-            photo = item.get("photo_id")
-            if photo in session.images:
-                parts += [f"Garment photo: {item['name']}", _jpeg(session.images[photo][0])]
+            photo = _garment_photo(session, item)
+            if photo:
+                parts += [f"Garment photo: {item['name']}", _jpeg(photo)]
                 lines.append(f"- {item['name']} (use the garment photo labelled '{item['name']}'), {wear}")
                 from_photos.append(item["name"])
             else:
@@ -130,7 +141,7 @@ def try_on_outfit(session, item_ids: list[str] | None = None, person_photo_id: s
     return json.dumps({
         "image_url": f"/image/{session.id}/{image_id}",
         "items": [i["name"] for i in items],
-        "from_your_photos": from_photos,
+        "from_photos": from_photos,
         "note": "The page shows the picture under your answer. Tell the user it is an AI preview: colors and fit "
                 "are approximate. Do not describe the image in detail.",
     })

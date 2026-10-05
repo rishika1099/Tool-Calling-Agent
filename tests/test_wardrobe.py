@@ -184,3 +184,14 @@ def test_page_is_revalidated_and_static_files_are_versioned():
     for name in ("style.css", "sky.js", "app.js"):
         assert f"/static/{name}?v=" in res.text
     assert TestClient(app_module.app).get("/static/app.js?v=anything").status_code == 200
+
+
+def test_demo_closet_photos_exist_and_are_served():
+    client = TestClient(app_module.app)
+    items = client.get("/wardrobe").json()["items"]
+    with_photo = [i for i in items if i["photo_url"]]
+    assert len(with_photo) == 21 and len(items) == 27
+    for item in with_photo:
+        assert item["photo_url"].startswith("/static/closet/")
+    assert client.get(with_photo[0]["photo_url"]).headers["content-type"] == "image/jpeg"
+    assert all((app_module.STATIC / i["photo"]).is_file() for i in items if i.get("photo"))

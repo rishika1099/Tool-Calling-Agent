@@ -53,11 +53,11 @@ def test_preview_is_stored_and_served_not_inlined(fake_model):
     raw = run_tool("try_on_outfit", {"item_ids": ["jeans-indigo", "my-sweater", "parka-black"]}, session)
     result = json.loads(raw)
     assert result["image_url"].startswith(f"/image/{sid}/tryon_")
-    assert result["from_your_photos"] == ["Maroon sweater"]
+    assert result["from_photos"] == ["Black down parka", "Maroon sweater", "Indigo jeans"]  # uploads and demo closet photos
     assert len(raw) < 800  # a link, never image bytes
 
     parts = fake_model["parts"]
-    assert sum(isinstance(p, bytes) for p in parts) == 2  # the person and the one photographed garment
+    assert sum(isinstance(p, bytes) for p in parts) == 4  # the person and three garment photos
     prompt = parts[-1]
     assert prompt.index("Black down parka") < prompt.index("Maroon sweater") < prompt.index("Indigo jeans")  # outermost first
 
