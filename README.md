@@ -20,7 +20,7 @@ skip straight to the chat with "or try it with a demo closet".
 
 IEOR 4570 Project 1. Team: Rishika, Shreya, Kshamaa.
 
-**Live app:** https://layer-lab-635182820659.us-east1.run.app (sign in with a Columbia account)
+**Live app:** https://layer-lab.cloud.run (sign in with a Columbia account). Same app, original address: https://layer-lab-635182820659.us-east1.run.app
 
 ![Layer Lab architecture: the browser posts to FastAPI on Cloud Run; the agent loop sends the conversation to Gemini and runs the tools it asks for, which use session state, clothing warmth tables, Open-Meteo and the National Weather Service](docs/architecture.svg)
 
@@ -82,6 +82,8 @@ Layer Lab gives clothing suggestions, not medical or safety advice.
 The animated sky ports the WebGL shader from [Originkit](https://www.originkit.dev)'s Cloud Sky component. Several UI effects are plain-JS versions of [React Bits](https://reactbits.dev) components (see DESIGN.md). Motion by [anime.js](https://animejs.com).
 
 ## Tests
+
+The full plan, mapped to the grading rubric with the latest live results, is in [TESTING.md](TESTING.md).
 
 - `uv run pytest`: offline checks of the warmth model (including the ISO 7730 PMV reference values) and the outfit builder.
 - `uv run python evals/tool_calls.py`: 11 real prompts through the agent, checking it calls the right tools in the right order (needs Gemini credentials).

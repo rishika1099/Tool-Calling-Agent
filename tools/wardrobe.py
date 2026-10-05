@@ -39,7 +39,8 @@ FIBER_ALIASES = {
 
 SCAN_PROMPT = f"""You label clothing photos for a wardrobe app. The first image is a garment; a second image,
 if present, is its care label. Reply with one JSON object only, with exactly these keys:
-{{"is_clothing": true or false,
+{{"is_clothing": true or false (false if the first image is not a wearable garment: for example a care label,
+                  tag, receipt, note or screenshot on its own, even one that names a garment),
   "name": "short everyday name with color, e.g. Grey wool sweater",
   "garment_type": one of {sorted(GARMENTS)},
   "fit": one of {FITS},

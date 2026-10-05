@@ -105,6 +105,12 @@ function garmentSvg(item) {
 
 // ---------- Motion helpers ----------
 
+// Wait for an animation, but never much longer than it should take. Browsers pause animations in
+// a background tab; sending a message or leaving the intro must still go through there.
+function finish(animation, ms) {
+    return Promise.race([animation, new Promise((resolve) => setTimeout(resolve, ms))]);
+}
+
 function enter(targets, { delay = 60, y = 12, blur = 0, duration = 620 } = {}) {
     if (!A) return;
     const params = { opacity: { from: 0 }, translateY: { from: y }, duration, delay: A.stagger(delay), ease: "outExpo" };
@@ -368,14 +374,14 @@ function renderCloset(selectedIds) {
 }
 
 async function removeItem(item, cell) {
-    if (A) await A.animate(cell, { opacity: 0, scale: 0.8, duration: 300, ease: "inQuad" });
+    if (A) await finish(A.animate(cell, { opacity: 0, scale: 0.8, duration: 300, ease: "inQuad" }), 500);
     await fetch(`/wardrobe/item?session_id=${encodeURIComponent(sessionId)}&item_id=${encodeURIComponent(item.id)}`, { method: "DELETE" });
     await refresh();
 }
 
 async function toggleLaundry(item, btn) {
     const status = item.status === "in_laundry" ? "clean" : "in_laundry";
-    if (A) await A.animate(btn, { scale: [1, 0.9, 1], duration: 380, ease: "outQuad" });
+    if (A) await finish(A.animate(btn, { scale: [1, 0.9, 1], duration: 380, ease: "outQuad" }), 600);
     await fetch("/wardrobe/status", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -631,7 +637,7 @@ async function sendMessage(text) {
     if (!text && !pending.length) return;
     const intro = $("#intro");
     if (intro) {
-        if (A) await A.animate(intro, { opacity: 0, translateY: -20, filter: "blur(8px)", duration: 350, ease: "inQuad" });
+        if (A) await finish(A.animate(intro, { opacity: 0, translateY: -20, filter: "blur(8px)", duration: 350, ease: "inQuad" }), 600);
         intro.remove();
     }
     const photos = pending;
@@ -1051,14 +1057,14 @@ async function finishSetup() {
     const { borrowed } = await res.json();
     await refresh();
     const own = closetItems.filter((i) => i.user_added).length;
-    if (A) await A.animate("#setup", { opacity: 0, translateY: -16, duration: 350, ease: "inQuad" });
+    if (A) await finish(A.animate("#setup", { opacity: 0, translateY: -16, duration: 350, ease: "inQuad" }), 600);
     showChat(`Closet ready: ${own} of your own piece${own === 1 ? "" : "s"}${borrowed.length ? ` + borrowed ${borrowed.join(", ").toLowerCase()}` : ""}`);
 }
 
 $("#setup-done").addEventListener("click", finishSetup);
 $("#setup-demo").addEventListener("click", async () => {
     await startMode("demo");
-    if (A) await A.animate("#setup", { opacity: 0, translateY: -16, duration: 350, ease: "inQuad" });
+    if (A) await finish(A.animate("#setup", { opacity: 0, translateY: -16, duration: 350, ease: "inQuad" }), 600);
     showChat("Using the demo closet (27 pieces)");
 });
 
@@ -1125,7 +1131,7 @@ function runPortal(setupDone) {
             A.utils?.remove?.(fading);  // stop the intro's own animations on these
             A.animate(fading, { opacity: 0, duration: 300, ease: "outQuad",
                 onComplete: () => fading.forEach((el) => { el.style.opacity = "0"; }) });
-            await A.animate(scene, { scale: 16, duration: 1200, delay: 300, ease: "inOutQuart" });
+            await finish(A.animate(scene, { scale: 16, duration: 1200, delay: 300, ease: "inOutQuart" }), 2200);
         }
         await ready;
         portal.remove();
