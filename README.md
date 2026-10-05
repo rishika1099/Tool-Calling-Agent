@@ -12,6 +12,9 @@ to class at 9, sit in class until 1, wait for the bus"), and Layer Lab:
 3. picks an outfit **from your own closet** that works both outside and in a heated classroom,
    skipping anything in the laundry and warning about rain and wind.
 
+**See it on you:** add a full-body photo under "Your layers" (or use the built-in sample photo of a
+fictional, AI-generated person), ask for an outfit, then click "See it on me".
+
 **How to use it:** the intro shows today's real sky through a bedroom window. "Build my closet" takes
 you to Step 1: drop in photos of your clothes (and their care labels); each photo is scanned by Gemini
 vision, you check the details, and the checklist shows when you have a shirt, bottoms, a coat and shoes
@@ -45,7 +48,7 @@ A demo closet is loaded in every new session, so these work without uploading an
 | `list_wardrobe` / `update_wardrobe` | shared | Shows the closet; marks items worn, clean or in the laundry. A worn item past its wear limit (Shreya, per garment type in `garments.csv`) goes to the laundry automatically |
 | `scan_garment` | Shreya | Adds clothes from a photo with Gemini vision, reading the care label for the exact fiber mix; every field is validated against fixed lists. Sample photos: `data/demo_photos/` |
 | `style_check` | Kshamaa | Scores whether an outfit goes together: color, shape, pattern, occasion |
-| `try_on_outfit` | bonus | Shows the user wearing the outfit (Vertex AI) *(in progress)* |
+| `try_on_outfit` | Rishika | Shows the user wearing the outfit: one generated image from their photo, their garment photos and the outfit list (Gemini image model on Vertex AI) |
 
 Every `/chat` response returns `response`, `session_id` and `tool_calls` (name, args, result),
 and the page shows each tool call above the answer.
@@ -92,6 +95,7 @@ The full plan, mapped to the grading rubric with the latest live results, is in 
 
 Photos and anything read from them (care labels, printed text) are treated as data, never as instructions.
 Uploads are limited to images under 8 MB, kept in memory for the session only, and never logged or committed.
+For a try-on preview, your photo and the garment photos are sent to Google's image model through Vertex AI.
 
 ## Deploy
 

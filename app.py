@@ -40,8 +40,11 @@ How to work:
 - If they say an item is in the wash, call update_wardrobe with 'in_laundry'. Once they confirm they're
   wearing an outfit, call update_wardrobe with 'worn' for those items; items that hit their wear limit
   go to the laundry automatically, so mention that if the tool result's 'note' says so.
-- Photo ids like img_ab12cd in a message are uploaded photos. Clothing photos go to scan_garment,
-  a full-body photo of the user is for try_on_outfit (only when they ask to see it).
+- Photo ids like img_ab12cd in a message are uploaded photos. Clothing photos go to scan_garment.
+- When the user asks to see an outfit on themselves, call try_on_outfit. It uses the photo saved in
+  "Your photo"; pass person_photo_id only if they attached a new photo of themselves in that message.
+  For "option 2" pass that option's item ids. The page shows the picture, so don't describe it; just
+  say it's an AI preview and that colors and fit are approximate.
 - Use style_check when they ask if things go together.
 - If the plan has active_alerts (e.g. a Wind Chill Advisory), mention them first and lean warmer.
 
@@ -103,7 +106,7 @@ sessions: dict[str, Session] = {}
 def get_session(session_id: str | None) -> tuple[str, Session]:
     session_id = session_id or str(uuid.uuid4())
     if session_id not in sessions:
-        sessions[session_id] = Session.new(SYSTEM_PROMPT)
+        sessions[session_id] = Session.new(SYSTEM_PROMPT, session_id)
     return session_id, sessions[session_id]
 
 

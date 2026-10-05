@@ -26,6 +26,7 @@ let personPhotoId = null;
 const photoUrl = (id) => `/image/${encodeURIComponent(sessionId)}/${encodeURIComponent(id)}`;
 
 const LOADING = ["Checking the forecast", "Working out warmth", "Going through your closet", "Layering it up"];
+const LOADING_TRYON = ["Getting your photo", "Dressing you in the outfit", "Painting the preview", "Almost there"];
 const PHRASES = ["walk to class.", "bus stop at 6pm.", "three-hour lecture.", "first snow.", "subway platform.", "8am interview."];
 
 // ---------- Small helpers ----------
@@ -574,6 +575,7 @@ function renderOutfit() {
     });
     renderOptionDetail(fresh);
     highlightCloset();
+    renderMe();
 
     if (fresh) {
         shownOutfit = lastOutfit;
@@ -620,6 +622,20 @@ function addAssistantMessage(response, toolCalls) {
     content.className = "content";
     content.innerHTML = renderMarkdown(response);
     div.appendChild(content);
+    // A try-on preview, if the agent made one.
+    for (const call of toolCalls) {
+        if (call.name !== "try_on_outfit") continue;
+        let result = {};
+        try { result = JSON.parse(call.result); } catch (e) { /* not JSON */ }
+        if (!result.image_url) continue;
+        const fig = document.createElement("figure");
+        fig.className = "tryon";
+        fig.innerHTML = `<img src="${escapeHtml(result.image_url)}" alt="AI preview of you wearing ${escapeHtml((result.items || []).join(", "))}">
+            <figcaption>AI preview · colors and fit are approximate</figcaption>`;
+        fig.querySelector("img").addEventListener("load", () => messagesEl.scrollTo({ top: messagesEl.scrollHeight, behavior: "smooth" }));
+        div.appendChild(fig);
+        showPreview(result.image_url);
+    }
     messagesEl.appendChild(div);
 
     if (A) {
@@ -653,8 +669,9 @@ async function sendMessage(text) {
     const loading = document.createElement("div");
     loading.className = "shimmer";
     let tick = 0;
-    loading.textContent = `${LOADING[0]}...`;
-    const timer = setInterval(() => { loading.textContent = `${LOADING[++tick % LOADING.length]}...`; }, 1800);
+    const steps = /\b(show me|on me|try (it|this|that)? ?on|wearing|look on)\b/i.test(text) ? LOADING_TRYON : LOADING;
+    loading.textContent = `${steps[0]}...`;
+    const timer = setInterval(() => { loading.textContent = `${steps[Math.min(++tick, steps.length - 1)]}...`; }, steps === LOADING_TRYON ? 3500 : 1800);
     messagesEl.appendChild(loading);
     messagesEl.scrollTop = messagesEl.scrollHeight;
 
@@ -909,17 +926,33 @@ const dropzone = $("#dropzone");
 ["dragleave", "drop"].forEach((t) => dropzone.addEventListener(t, (e) => { e.preventDefault(); dropzone.classList.remove("over"); }));
 dropzone.addEventListener("drop", (e) => [...e.dataTransfer.files].filter((f) => f.type.startsWith("image/")).forEach(addDraft));
 
-// ---------- Your photo (for try-on) ----------
+// ---------- Your photo and try-on ----------
 
 function renderMe() {
     const box = $("#me-photo");
     box.style.backgroundImage = personPhotoId ? `url("${photoUrl(personPhotoId)}")` : "";
     box.classList.toggle("filled", !!personPhotoId);
     $("#me-clear").hidden = !personPhotoId;
-    $("#me-note").textContent = personPhotoId
-        ? "Saved for this session. Try-on previews are coming soon."
-        : "Add a full-body photo to see outfits on you (try-on is coming soon).";
+    $("#me-sample").hidden = !!personPhotoId;
+    const hasOutfit = !!lastOutfit?.options?.length;
+    $("#me-try").hidden = !(personPhotoId && hasOutfit);
+    $("#me-note").textContent = !personPhotoId
+        ? "Add a full-body photo, facing the camera, to see outfits on you. It is sent to Google's image model to make the preview and kept only for this session."
+        : hasOutfit ? "Ready. See the outfit above on you; it takes about 15 seconds."
+        : "Saved for this session. Ask for an outfit, then see it on you.";
 }
+
+function showPreview(url) {
+    const el = $("#tryon-preview");
+    el.hidden = false;
+    el.innerHTML = `<img src="${escapeHtml(url)}" alt="AI preview of you in the outfit"><span>AI preview</span>`;
+    if (A) A.animate(el, { opacity: { from: 0 }, scale: { from: 0.94 }, duration: 800, ease: "outExpo" });
+}
+
+$("#me-try").addEventListener("click", () => {
+    const n = optionIndex + 1;
+    sendMessage(lastOutfit.options.length > 1 ? `Show me wearing option ${n}.` : "Show me wearing this outfit.");
+});
 
 async function setMe(imageId) {
     const res = await fetch("/me/photo", {
@@ -943,6 +976,15 @@ $("#me-input").addEventListener("change", async (e) => {
     }
 });
 $("#me-clear").addEventListener("click", () => setMe(null));
+// For trying it without your own picture: a fictional, AI-generated person.
+$("#me-sample").addEventListener("click", async () => {
+    try {
+        const blob = await (await fetch("/static/sample-person.jpg")).blob();
+        await setMe((await uploadFile(new File([blob], "sample-person.jpg", { type: "image/jpeg" }))).image_id);
+    } catch (err) {
+        $("#me-note").textContent = err.message;
+    }
+});
 
 // ---------- Wiring ----------
 

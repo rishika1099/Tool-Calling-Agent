@@ -156,9 +156,12 @@
                         <input id="me-input" type="file" accept="image/*" hidden />
                         <span class="me-empty" aria-hidden="true">+</span>
                     </label>
-                    <div><b>Your photo</b><span class="meta" id="me-note">Add a full-body photo to see outfits on you (try-on is coming soon).</span></div>
+                    <div class="me-text"><b>Your photo</b><span class="meta" id="me-note">Add a full-body photo, facing the camera, to see outfits on you.</span></div>
+                    <button id="me-sample" class="linkish" type="button">Use a sample photo</button>
+                    <button id="me-try" class="primary" type="button" hidden>See it on me</button>
                     <button id="me-clear" class="linkish" type="button" hidden>Remove</button>
                 </div>
+                <figure id="tryon-preview" class="tryon-preview" hidden></figure>
             </section>
 
             <section class="panel spot" aria-labelledby="closet-title">

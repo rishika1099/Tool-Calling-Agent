@@ -35,7 +35,7 @@ Due **Wed Oct 7, 11:59pm**. Team: Rishika (rishika1099), Shreya (shreyashetty2),
 | Architecture diagram in the README | done |
 | Deploy to Cloud Run | to do (Rishika) |
 | Comfort feedback ("I was freezing") adjusts future plans | done |
-| Try-on image (Vertex AI) | bonus (Rishika) |
+| Try-on image (Gemini image model on Vertex AI), with a sample person for testing | done |
 | Launch video with /brag | last day (Kshamaa) |
 
 ## Who owns what
