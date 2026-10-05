@@ -1,4 +1,6 @@
+import hashlib
 import json
+import re
 import secrets
 import uuid
 from pathlib import Path
@@ -6,7 +8,7 @@ from pathlib import Path
 import litellm
 import uvicorn
 from fastapi import FastAPI, File, Form, HTTPException, UploadFile
-from fastapi.responses import FileResponse, Response
+from fastapi.responses import HTMLResponse, Response
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
@@ -112,6 +114,22 @@ STATIC = Path(__file__).parent / "static"
 app.mount("/static", StaticFiles(directory=STATIC), name="static")
 
 
+def _index_html() -> str:
+    """index.html with a content hash on each /static/ file, e.g. /static/app.js?v=3fa9c1d2.
+
+    Browsers cache static files for a long time, so without this a returning visitor keeps
+    running the old script after a deploy. A changed file gets a new URL; unchanged ones stay cached.
+    """
+    def versioned(match: re.Match) -> str:
+        path = STATIC / match.group(1)
+        digest = hashlib.sha256(path.read_bytes()).hexdigest()[:8] if path.is_file() else "0"
+        return f"/static/{match.group(1)}?v={digest}"
+    return re.sub(r"/static/([\w.-]+\.(?:js|css))", versioned, (STATIC / "index.html").read_text())
+
+
+INDEX_HTML = _index_html()
+
+
 class ChatRequest(BaseModel):
     message: str
     session_id: str | None = None
@@ -161,7 +179,8 @@ class ProfileRequest(BaseModel):
 
 @app.get("/")
 def index():
-    return FileResponse(STATIC / "index.html")
+    # no-cache: the browser may keep the page but must check with us before reusing it.
+    return HTMLResponse(INDEX_HTML, headers={"Cache-Control": "no-cache"})
 
 
 @app.post("/chat", response_model=ChatResponse)

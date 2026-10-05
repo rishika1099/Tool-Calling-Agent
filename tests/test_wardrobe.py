@@ -176,3 +176,11 @@ def test_closet_setup_starts_empty_and_borrows_missing_basics():
     assert state["setup_done"] is True and len(state["items"]) == 4
     assert client.post("/wardrobe/start", json={"session_id": sid, "mode": "demo"}).json()["items"] == 27
     assert client.post("/wardrobe/start", json={"session_id": sid, "mode": "nope"}).status_code == 400
+
+
+def test_page_is_revalidated_and_static_files_are_versioned():
+    res = TestClient(app_module.app).get("/")
+    assert res.headers["cache-control"] == "no-cache"
+    for name in ("style.css", "sky.js", "app.js"):
+        assert f"/static/{name}?v=" in res.text
+    assert TestClient(app_module.app).get("/static/app.js?v=anything").status_code == 200
