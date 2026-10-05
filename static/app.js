@@ -256,6 +256,14 @@ function setupHero() {
 
 // ---------- Live conditions -> sky ----------
 
+// The phone's browser bar takes the scene's color: the dark room at the intro, then day or night sky.
+function setChromeColor() {
+    const meta = document.querySelector('meta[name="theme-color"]');
+    if (!meta) return;
+    meta.content = document.body.classList.contains("at-portal") ? "#1c1814"
+        : document.documentElement.dataset.theme === "dark" ? "#0b1424" : "#2f72d6";
+}
+
 async function loadConditions() {
     try {
         const res = await fetch("/conditions");
@@ -266,6 +274,7 @@ async function loadConditions() {
         if (portalTemp) portalTemp.textContent = `${c.temp_f}°F · ${c.location}`;
         const isNight = c.is_day === false;
         document.documentElement.dataset.theme = isNight ? "dark" : "light";
+        setChromeColor();
         window.Sky?.set({
             night: isNight,
             mode: c.snow ? "snow" : c.rain ? "rain" : "calm",
@@ -1063,6 +1072,7 @@ function markPortalSeen() {
 }
 
 function enterApp(view) {
+    setChromeColor();
     view === "setup" ? showSetup() : showChat();
     if (A) A.animate(".topbar, .chat, .panels .panel", { opacity: { from: 0 }, translateY: { from: 40 }, scale: { from: 0.98 },
         duration: 1000, delay: A.stagger(90), ease: "outExpo" });

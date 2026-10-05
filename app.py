@@ -8,7 +8,7 @@ from pathlib import Path
 import litellm
 import uvicorn
 from fastapi import FastAPI, File, Form, HTTPException, UploadFile
-from fastapi.responses import HTMLResponse, Response
+from fastapi.responses import FileResponse, HTMLResponse, Response
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
@@ -124,7 +124,7 @@ def _index_html() -> str:
         path = STATIC / match.group(1)
         digest = hashlib.sha256(path.read_bytes()).hexdigest()[:8] if path.is_file() else "0"
         return f"/static/{match.group(1)}?v={digest}"
-    return re.sub(r"/static/([\w.-]+\.(?:js|css))", versioned, (STATIC / "index.html").read_text())
+    return re.sub(r"/static/([\w.-]+\.(?:js|css|svg|png|webmanifest))", versioned, (STATIC / "index.html").read_text())
 
 
 INDEX_HTML = _index_html()
@@ -196,6 +196,11 @@ def chat(request: ChatRequest):
         response, tool_calls = f"Model call failed: {type(e).__name__}: {first_line}", []
 
     return ChatResponse(response=response, session_id=session_id, tool_calls=tool_calls)
+
+
+@app.get("/favicon.ico", include_in_schema=False)
+def favicon():
+    return FileResponse(STATIC / "favicon.ico", headers={"Cache-Control": "public, max-age=86400"})
 
 
 @app.get("/conditions")

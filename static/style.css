@@ -45,6 +45,7 @@
 }
 
 * { box-sizing: border-box; margin: 0; padding: 0; }
+[hidden] { display: none !important; }  /* .setup and .hero set display: flex, which would otherwise un-hide them */
 
 html { background: #b4d2f0; }
 
@@ -922,9 +923,10 @@ body.in-setup #composer { display: none; }
 
 @media (max-width: 960px) {
     .topbar { padding: 16px; }
-    .controls { width: 100%; }
+    .controls { width: 100%; flex-wrap: nowrap; }
     .thermostat { flex: 1; justify-content: space-between; }
-    .thermostat button { padding: 7px 10px; }
+    .thermostat button { padding: 7px 10px; white-space: nowrap; }
+    .ghost { white-space: nowrap; }
     .flex-carousel { height: 132px; gap: 8px; }
     .d-row { grid-template-columns: 1fr; }
     .layout { grid-template-columns: 1fr; padding: 0 16px 16px; }
@@ -933,6 +935,41 @@ body.in-setup #composer { display: none; }
     .msg { max-width: 96%; }
     .fit-grid { grid-template-columns: 1fr; }
     .gauges { grid-template-columns: repeat(2, 120px); justify-content: center; }
+}
+
+/* Phones */
+@media (max-width: 520px) {
+    .topbar { padding: 14px 12px 12px; gap: 12px; }
+    .word { font-size: 23px; }
+    .thermostat button { padding: 7px 6px; font-size: 12px; flex: 1; }
+    .ghost { padding: 8px 12px; font-size: 12px; }
+    .layout { padding: 0 12px 12px; gap: 14px; }
+    .panels { gap: 14px; }
+    .panels .panel { padding: 16px 14px 18px; }
+    .panel-head { flex-wrap: wrap; }
+    #messages { padding: 20px 14px 10px; gap: 16px; }
+    .hero-title { font-size: clamp(36px, 11vw, 48px); }
+    #composer { padding: 10px 10px 12px; }
+    .composer-row { gap: 4px; padding: 5px; }
+    .attach { width: 38px; height: 40px; }
+    #user-input { padding: 10px 4px; font-size: 16px; }  /* 16px stops iOS from zooming in on focus */
+    #send { padding: 10px 12px; }
+    #send span { display: none; }  /* arrow only */
+    .prompt { grid-template-columns: 26px 1fr; padding: 12px; }
+    .prompt::after { display: none; }
+    /* Your day: time and details on one row, the clo range underneath. */
+    .segs li { grid-template-columns: 46px 1fr; row-gap: 6px; }
+    .segs .need { grid-column: 2; justify-self: start; }
+    .ribbon .band { min-width: 40px; padding: 7px 6px; }
+    .closet { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; }
+    .item { padding: 8px 4px; font-size: 11px; }
+    .adder { padding: 10px; }
+    .adder-actions { flex-wrap: wrap; }
+    .adder-actions .meta { flex-basis: 100%; }
+    .draft { grid-template-columns: 60px 1fr; padding-right: 30px; }
+    .d-thumb { width: 60px; height: 76px; }
+    .me-slot { flex-wrap: wrap; }
+    .tools pre { max-height: 200px; }
 }
 
 @media (prefers-reduced-motion: reduce) {
