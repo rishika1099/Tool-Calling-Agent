@@ -1108,6 +1108,7 @@ function runPortal(setupDone) {
             // The text, frame, pane dividers, curtains and sill fade away first, so only a clean
             // opening onto the sky grows, not giant white bars.
             const fading = portal.querySelectorAll(".portal-top, .portal-copy, .portal-foot, .lamp-light, .frame, .muntin, .glare, .sill, .curtain, .rod");
+            portal.classList.add("leaving");
             A.utils?.remove?.(fading);  // stop the intro's own animations on these
             A.animate(fading, { opacity: 0, duration: 300, ease: "outQuad",
                 onComplete: () => fading.forEach((el) => { el.style.opacity = "0"; }) });
