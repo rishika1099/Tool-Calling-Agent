@@ -58,6 +58,8 @@ How to answer:
 
 # --- The Harness ---
 
+EMPTY_ANSWER = "Sorry, I didn't get an answer that time. Please send that again."
+
 
 def run_agent(session: Session) -> tuple[str, list[dict]]:
     """Complete until the model answers without asking for a tool.
@@ -66,6 +68,7 @@ def run_agent(session: Session) -> tuple[str, list[dict]]:
     """
     messages = session.messages
     tool_calls = []
+    nudge = []  # set after an empty answer; sent once, never stored in the session
 
     for _ in range(MAX_TOOL_ROUNDS):
         reply = litellm.completion(
@@ -73,16 +76,25 @@ def run_agent(session: Session) -> tuple[str, list[dict]]:
             vertex_location=VERTEX_LOCATION,
             timeout=MODEL_TIMEOUT,
             num_retries=MODEL_RETRIES,
-            messages=messages,
+            messages=messages + nudge,
             tools=TOOLS,
         ).choices[0].message
+
+        if not reply.tool_calls:
+            text = (reply.content or "").strip()
+            if not text and not nudge:
+                # The model sometimes answers with nothing. Don't store that turn (an empty
+                # turn in the history makes every later answer empty too); ask once more.
+                nudge = [{"role": "user", "content": "Answer my last message now, in plain text."}]
+                continue
+            text = text or EMPTY_ANSWER
+            messages += [{"role": "assistant", "content": text}]
+            return text, tool_calls
 
         # model_dump() keeps it a plain dict: the raw object carries provider-specific
         # fields that trip Pydantic when LiteLLM re-serializes it next round.
         messages += [reply.model_dump()]
-
-        if not reply.tool_calls:
-            return reply.content, tool_calls
+        nudge = []
 
         # The harness, not the model, runs each tool and appends the result.
         for call in reply.tool_calls:

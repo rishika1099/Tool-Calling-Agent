@@ -681,6 +681,13 @@ async function sendMessage(text) {
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ message, session_id: sessionId }),
         });
+        // Anything that isn't our JSON (sign-in page after the session expires, a restart,
+        // a server error) would make res.json() throw a cryptic parse error.
+        if (!(res.headers.get("content-type") || "").includes("application/json") || !res.ok) {
+            throw new Error(res.ok || res.status === 401 || res.status === 403
+                ? "your sign-in may have expired. Reload the page and try again."
+                : `the server had a problem (${res.status}). Please send that again.`);
+        }
         const data = await res.json();
         sessionId = data.session_id;
         for (const call of data.tool_calls) {
