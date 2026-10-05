@@ -1036,6 +1036,13 @@ document.querySelectorAll(".thermostat button").forEach((btn) => {
         });
     });
 });
+document.querySelector(".wordmark").addEventListener("click", (e) => {
+    // The logo returns to the bedroom-window intro, not just a reload into the same view.
+    // Unlike "New session" this keeps the closet and chat history: it only re-shows the portal.
+    e.preventDefault();
+    forgetPortalSeen();
+    location.href = "/";
+});
 $("#new-day").addEventListener("click", async () => {
     await fetch(`/clear?session_id=${encodeURIComponent(sessionId)}`, { method: "POST" });
     sessionId = null;
@@ -1139,6 +1146,9 @@ function portalSeen() {
 }
 function markPortalSeen() {
     try { sessionStorage.setItem("layerlab-portal", "1"); } catch (e) { /* fine */ }
+}
+function forgetPortalSeen() {
+    try { sessionStorage.removeItem("layerlab-portal"); } catch (e) { /* fine */ }
 }
 
 function enterApp(view) {
