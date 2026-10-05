@@ -112,18 +112,33 @@ function finish(animation, ms) {
     return Promise.race([animation, new Promise((resolve) => setTimeout(resolve, ms))]);
 }
 
+// anime.js v4 animates CSS properties through the native Web Animations API by default.
+// Safari's implementation of it is far stricter than Chrome's about malformed keyframe
+// values (NaN clo numbers, a stale computed custom property) and throws where Chrome
+// silently no-ops. Animation is decoration, not data: never let it take the chat response
+// or a render down with it, so every animate call in this file goes through this instead.
+function safeAnimate(...args) {
+    if (!A) return undefined;
+    try {
+        return A.animate(...args);
+    } catch (e) {
+        console.warn("Layer Lab: skipped an animation that the browser rejected:", e.message);
+        return undefined;
+    }
+}
+
 function enter(targets, { delay = 60, y = 12, blur = 0, duration = 620 } = {}) {
     if (!A) return;
     const params = { opacity: { from: 0 }, translateY: { from: y }, duration, delay: A.stagger(delay), ease: "outExpo" };
     if (blur) params.filter = { from: `blur(${blur}px)`, to: "blur(0px)" };
-    A.animate(targets, params);
+    safeAnimate(targets, params);
 }
 
 function countUp(el) {
     const to = parseFloat(el.textContent);
     if (!A || Number.isNaN(to)) return;
     const state = { v: 0 };
-    A.animate(state, { v: to, duration: 1100, ease: "outExpo", onUpdate: () => { el.textContent = state.v.toFixed(2); } });
+    safeAnimate(state, { v: to, duration: 1100, ease: "outExpo", onUpdate: () => { el.textContent = state.v.toFixed(2); } });
 }
 
 function splitChars(el, text) {
@@ -188,7 +203,7 @@ function spark(x, y) {
         s.style.rotate = `${angle}deg`;
         document.body.appendChild(s);
         const rad = (angle - 90) * Math.PI / 180;
-        A.animate(s, {
+        safeAnimate(s, {
             translateX: Math.cos(rad) * 34, translateY: Math.sin(rad) * 34,
             scaleY: { from: 1, to: 0 }, opacity: { from: 1, to: 0 },
             duration: 520, ease: "outQuart", onComplete: () => s.remove(),
@@ -210,13 +225,13 @@ function setupHero() {
     splitChars(rotator, PHRASES[0]);
 
     if (A) {
-        A.animate(chars, { opacity: { from: 0 }, translateY: { from: "0.4em" }, filter: { from: "blur(10px)", to: "blur(0px)" },
+        safeAnimate(chars, { opacity: { from: 0 }, translateY: { from: "0.4em" }, filter: { from: "blur(10px)", to: "blur(0px)" },
             duration: 900, delay: A.stagger(35), ease: "outExpo" });
-        A.animate(rotator.querySelectorAll(".ch"), { opacity: { from: 0 }, translateY: { from: "0.5em" },
+        safeAnimate(rotator.querySelectorAll(".ch"), { opacity: { from: 0 }, translateY: { from: "0.5em" },
             duration: 800, delay: A.stagger(25, { start: 420 }), ease: "outExpo" });
         enter(".hero .lede, .hero .prompt", { delay: 70, y: 16, duration: 800 });
         enter(".mark i", { delay: 90, y: 0 });
-        A.animate(".mark i", { scaleX: { from: 0 }, duration: 900, delay: A.stagger(90), ease: "outExpo" });
+        safeAnimate(".mark i", { scaleX: { from: 0 }, duration: 900, delay: A.stagger(90), ease: "outExpo" });
     }
 
     // Letters get heavier and softer as the pointer approaches (Fraunces variable axes).
@@ -244,12 +259,12 @@ function setupHero() {
         if (!document.body.contains(rotator)) return;
         phrase = (phrase + 1) % PHRASES.length;
         if (!A) { rotator.textContent = PHRASES[phrase]; return; }
-        A.animate(rotator.querySelectorAll(".ch"), {
+        safeAnimate(rotator.querySelectorAll(".ch"), {
             opacity: { to: 0 }, translateY: { to: "-0.45em" }, filter: { to: "blur(6px)" },
             duration: 380, delay: A.stagger(14), ease: "inQuad",
             onComplete: () => {
                 const next = splitChars(rotator, PHRASES[phrase]);
-                A.animate(next, { opacity: { from: 0 }, translateY: { from: "0.5em" }, filter: { from: "blur(6px)", to: "blur(0px)" },
+                safeAnimate(next, { opacity: { from: 0 }, translateY: { from: "0.5em" }, filter: { from: "blur(6px)", to: "blur(0px)" },
                     duration: 700, delay: A.stagger(20), ease: "outExpo" });
             },
         });
@@ -330,7 +345,7 @@ function renderSensitivity(level) {
     if (!active) return;
     const to = { translateX: active.offsetLeft, width: active.offsetWidth };
     if (A && thumbPlaced) {
-        A.animate(thumb, { ...to, duration: 650, ease: "outElastic(1, .7)" });
+        safeAnimate(thumb, { ...to, duration: 650, ease: "outElastic(1, .7)" });
     } else {
         thumb.style.transform = `translateX(${to.translateX}px)`;
         thumb.style.width = `${to.width}px`;
@@ -369,20 +384,20 @@ function renderCloset(selectedIds) {
     }
     if (!closetShown && closetItems.length) {
         closetShown = true;
-        if (A) A.animate("#closet .item", { opacity: { from: 0 }, scale: { from: 0.85 }, duration: 700,
+        if (A) safeAnimate("#closet .item", { opacity: { from: 0 }, scale: { from: 0.85 }, duration: 700,
             delay: A.stagger(22, { grid: [3, Math.ceil(closetItems.length / 3)], from: "first" }), ease: "outExpo" });
     }
 }
 
 async function removeItem(item, cell) {
-    if (A) await finish(A.animate(cell, { opacity: 0, scale: 0.8, duration: 300, ease: "inQuad" }), 500);
+    if (A) await finish(safeAnimate(cell, { opacity: 0, scale: 0.8, duration: 300, ease: "inQuad" }), 500);
     await fetch(`/wardrobe/item?session_id=${encodeURIComponent(sessionId)}&item_id=${encodeURIComponent(item.id)}`, { method: "DELETE" });
     await refresh();
 }
 
 async function toggleLaundry(item, btn) {
     const status = item.status === "in_laundry" ? "clean" : "in_laundry";
-    if (A) await finish(A.animate(btn, { scale: [1, 0.9, 1], duration: 380, ease: "outQuad" }), 600);
+    if (A) await finish(safeAnimate(btn, { scale: [1, 0.9, 1], duration: 380, ease: "outQuad" }), 600);
     await fetch("/wardrobe/status", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -430,7 +445,7 @@ function renderDay(plan) {
         shownPlan = key;
         skyFromPlan(plan);
         if (A) {
-            A.animate("#day .ribbon .band", { scaleX: { from: 0 }, opacity: { from: 0 }, duration: 900, delay: A.stagger(110), ease: "outExpo" });
+            safeAnimate("#day .ribbon .band", { scaleX: { from: 0 }, opacity: { from: 0 }, duration: 900, delay: A.stagger(110), ease: "outExpo" });
             enter("#day .alert, #day .segs li", { delay: 70, y: 10 });
         }
     }
@@ -506,7 +521,7 @@ function focusCard(index) {
         if (!A) { c.style.flexGrow = on ? CAROUSEL.focusGrow : 1; return; }
         // "Liquid": a soft spring on the width, with a small squeeze on the others.
         const spring = A.createSpring ? A.createSpring({ stiffness: 140, damping: 13 }) : "outElastic(1, .75)";
-        A.animate(c, { flexGrow: on ? CAROUSEL.focusGrow : 1, scaleY: on ? 1 : 1 - CAROUSEL.squeeze * 0.25, ease: spring, duration: 900 });
+        safeAnimate(c, { flexGrow: on ? CAROUSEL.focusGrow : 1, scaleY: on ? 1 : 1 - CAROUSEL.squeeze * 0.25, ease: spring, duration: 900 });
     });
     renderOptionDetail(true);
     highlightCloset();
@@ -547,9 +562,9 @@ function renderOptionDetail(animate) {
 
     if (animate && A) {
         // Get dressed from the inside out: base layer first, coat last.
-        A.animate("#option-detail .layer", { opacity: { from: 0 }, translateY: { from: -18 }, scaleX: { from: 0.92 },
+        safeAnimate("#option-detail .layer", { opacity: { from: 0 }, translateY: { from: -18 }, scaleX: { from: 0.92 },
             duration: 700, delay: A.stagger(90, { from: "last" }), ease: "outBack(1.4)" });
-        A.animate("#option-detail .tube .fill", { scaleY: { from: 0 }, duration: 1200, delay: 200, ease: "outExpo" });
+        safeAnimate("#option-detail .tube .fill", { scaleY: { from: 0 }, duration: 1200, delay: 200, ease: "outExpo" });
         document.querySelectorAll("#option-detail .num").forEach(countUp);
         enter("#option-detail .extras span, #option-detail .takeoff, #option-detail .notes li", { delay: 50, y: 8 });
     }
@@ -580,7 +595,7 @@ function renderOutfit() {
     if (fresh) {
         shownOutfit = lastOutfit;
         // "Rise" intro for the suggestions.
-        if (A) A.animate("#outfit .fc-card", { opacity: { from: 0 }, translateY: { from: CAROUSEL.rise }, duration: 900,
+        if (A) safeAnimate("#outfit .fc-card", { opacity: { from: 0 }, translateY: { from: CAROUSEL.rise }, duration: 900,
             delay: A.stagger(90), ease: "outExpo" });
     }
 }
@@ -599,7 +614,7 @@ function addUserMessage(text, photos) {
         div.appendChild(img);
     }
     messagesEl.appendChild(div);
-    if (A) A.animate(div, { opacity: { from: 0 }, translateX: { from: 24 }, scale: { from: 0.96 }, duration: 600, ease: "outExpo" });
+    if (A) safeAnimate(div, { opacity: { from: 0 }, translateX: { from: 24 }, scale: { from: 0.96 }, duration: 600, ease: "outExpo" });
 }
 
 function addAssistantMessage(response, toolCalls) {
@@ -639,11 +654,11 @@ function addAssistantMessage(response, toolCalls) {
     messagesEl.appendChild(div);
 
     if (A) {
-        A.animate(div.querySelectorAll(".tools details"), { opacity: { from: 0 }, scale: { from: 0.7 }, duration: 500,
+        safeAnimate(div.querySelectorAll(".tools details"), { opacity: { from: 0 }, scale: { from: 0.7 }, duration: 500,
             delay: A.stagger(70), ease: "outBack(1.8)" });
         const words = [...splitWords(content)];
         const start = toolCalls.length * 70 + 150;
-        A.animate(words, { opacity: { from: 0 }, filter: { from: "blur(8px)", to: "blur(0px)" }, translateY: { from: 6 },
+        safeAnimate(words, { opacity: { from: 0 }, filter: { from: "blur(8px)", to: "blur(0px)" }, translateY: { from: 6 },
             duration: 600, delay: A.stagger(Math.max(6, Math.min(18, 900 / words.length)), { start }), ease: "outQuad" });
     }
 }
@@ -653,7 +668,7 @@ async function sendMessage(text) {
     if (!text && !pending.length) return;
     const intro = $("#intro");
     if (intro) {
-        if (A) await finish(A.animate(intro, { opacity: 0, translateY: -20, filter: "blur(8px)", duration: 350, ease: "inQuad" }), 600);
+        if (A) await finish(safeAnimate(intro, { opacity: 0, translateY: -20, filter: "blur(8px)", duration: 350, ease: "inQuad" }), 600);
         intro.remove();
     }
     const photos = pending;
@@ -824,7 +839,7 @@ async function addDraft(file) {
     });
     drafts.push(d);
     $("#drafts").appendChild(d.el);
-    if (A) A.animate(d.el, { opacity: { from: 0 }, translateY: { from: 14 }, duration: 500, ease: "outExpo" });
+    if (A) safeAnimate(d.el, { opacity: { from: 0 }, translateY: { from: 14 }, duration: 500, ease: "outExpo" });
     updateAddButton();
 
     setStatus(d, "Uploading...", "busy");
@@ -858,7 +873,7 @@ async function scanDraft(d) {
     d.el.querySelector(".d-mat").value = mainFiber(data.materials) || "cotton";
     const fibers = Object.entries(data.materials).map(([m, p]) => `${p}% ${m}`).join(", ");
     setStatus(d, data.materials_source === "label" ? `Read from label: ${fibers}` : `Guessed ${fibers}. A care label photo makes it exact.`, "ok");
-    if (A) A.animate(d.el.querySelectorAll(".d-name, .d-type, .d-mat"), { backgroundColor: { from: "rgba(224,87,47,0.18)" }, duration: 900, ease: "outQuad" });
+    if (A) safeAnimate(d.el.querySelectorAll(".d-name, .d-type, .d-mat"), { backgroundColor: { from: "rgba(224,87,47,0.18)" }, duration: 900, ease: "outQuad" });
 }
 
 async function saveDrafts() {
@@ -899,7 +914,7 @@ async function saveDrafts() {
     drafts = drafts.filter((d) => !saved.has(d));
     drafts.length ? updateAddButton() : closeAdder();
     await refresh();
-    if (A) A.animate(added.map((id) => document.querySelector(`#closet .item[data-id="${CSS.escape(id)}"]`)).filter(Boolean),
+    if (A) safeAnimate(added.map((id) => document.querySelector(`#closet .item[data-id="${CSS.escape(id)}"]`)).filter(Boolean),
         { scale: { from: 0.6 }, opacity: { from: 0 }, duration: 800, delay: A.stagger(80), ease: "outBack(1.8)" });
 }
 
@@ -908,7 +923,7 @@ function openAdder() {
     el.hidden = false;
     $("#add-open").hidden = true;
     loadCatalog();
-    if (A) A.animate(el, { opacity: { from: 0 }, translateY: { from: -10 }, duration: 450, ease: "outExpo" });
+    if (A) safeAnimate(el, { opacity: { from: 0 }, translateY: { from: -10 }, duration: 450, ease: "outExpo" });
 }
 function closeAdder() {
     if (document.body.classList.contains("in-setup")) {  // Step 1 keeps the drop zone open
@@ -953,7 +968,7 @@ function showPreview(url) {
     const el = $("#tryon-preview");
     el.hidden = false;
     el.innerHTML = `<img src="${escapeHtml(url)}" alt="AI preview of you in the outfit"><span>AI preview</span>`;
-    if (A) A.animate(el, { opacity: { from: 0 }, scale: { from: 0.94 }, duration: 800, ease: "outExpo" });
+    if (A) safeAnimate(el, { opacity: { from: 0 }, scale: { from: 0.94 }, duration: 800, ease: "outExpo" });
 }
 
 $("#me-try").addEventListener("click", () => {
@@ -969,7 +984,7 @@ async function setMe(imageId) {
     });
     if (res.ok) personPhotoId = (await res.json()).person_photo_id;
     renderMe();
-    if (A && personPhotoId) A.animate("#me-photo", { scale: { from: 0.7 }, duration: 700, ease: "outBack(2)" });
+    if (A && personPhotoId) safeAnimate("#me-photo", { scale: { from: 0.7 }, duration: 700, ease: "outBack(2)" });
 }
 
 $("#me-input").addEventListener("change", async (e) => {
@@ -1044,7 +1059,7 @@ function renderCoverage() {
         li.classList.toggle("done", count > 0);
         li.querySelector("b")?.remove();
         if (count) li.insertAdjacentHTML("beforeend", `<b>${count}</b>`);
-        if (A && count && !wasDone) A.animate(li, { scale: [1, 1.12, 1], duration: 500, ease: "outBack(2)" });
+        if (A && count && !wasDone) safeAnimate(li, { scale: [1, 1.12, 1], duration: 500, ease: "outBack(2)" });
     });
     const missing = [...document.querySelectorAll("#coverage li:not(.done)")].length;
     const own = closetItems.filter((i) => i.user_added).length;
@@ -1106,15 +1121,15 @@ async function finishSetup() {
     const { borrowed } = await res.json();
     await refresh();
     const own = closetItems.filter((i) => i.user_added).length;
-    if (A) await finish(A.animate("#setup", { opacity: 0, translateY: -16, duration: 350, ease: "inQuad" }), 600);
+    if (A) await finish(safeAnimate("#setup", { opacity: 0, translateY: -16, duration: 350, ease: "inQuad" }), 600);
     showChat(`Closet ready: ${own} of your own piece${own === 1 ? "" : "s"}${borrowed.length ? ` + borrowed ${borrowed.join(", ").toLowerCase()}` : ""}`);
 }
 
 $("#setup-done").addEventListener("click", finishSetup);
 $("#setup-demo").addEventListener("click", async () => {
     await startMode("demo");
-    if (A) await finish(A.animate("#setup", { opacity: 0, translateY: -16, duration: 350, ease: "inQuad" }), 600);
-    showChat("Using the demo closet (27 pieces)");
+    if (A) await finish(safeAnimate("#setup", { opacity: 0, translateY: -16, duration: 350, ease: "inQuad" }), 600);
+    showChat(`Using the demo closet (${closetItems.length} pieces)`);
 });
 
 // ---------- Intro: a bedroom window onto today's sky ----------
@@ -1129,7 +1144,7 @@ function markPortalSeen() {
 function enterApp(view) {
     setChromeColor();
     view === "setup" ? showSetup() : showChat();
-    if (A) A.animate(".topbar, .chat, .panels .panel", { opacity: { from: 0 }, translateY: { from: 40 }, scale: { from: 0.98 },
+    if (A) safeAnimate(".topbar, .chat, .panels .panel", { opacity: { from: 0 }, translateY: { from: 40 }, scale: { from: 0.98 },
         duration: 1000, delay: A.stagger(90), ease: "outExpo" });
 }
 
@@ -1149,8 +1164,8 @@ function runPortal(setupDone) {
 
     // Curtains draw back to show today's sky, and the copy settles in.
     if (A) {
-        A.animate(curtains, { scaleX: { from: 1, to: 0.36 }, duration: 2000, delay: 500, ease: "inOutQuart" });
-        A.animate(".portal-top, .portal-copy > *, .portal-foot", { opacity: { from: 0 }, translateY: { from: 22 },
+        safeAnimate(curtains, { scaleX: { from: 1, to: 0.36 }, duration: 2000, delay: 500, ease: "inOutQuart" });
+        safeAnimate(".portal-top, .portal-copy > *, .portal-foot", { opacity: { from: 0 }, translateY: { from: 22 },
             duration: 1000, delay: A.stagger(110, { start: 300 }), ease: "outExpo" });
     } else {
         curtains.forEach((c) => c.classList.add("open"));
@@ -1178,9 +1193,9 @@ function runPortal(setupDone) {
             const fading = portal.querySelectorAll(".portal-top, .portal-copy, .portal-foot, .lamp-light, .frame, .muntin, .glare, .sill, .curtain, .rod");
             portal.classList.add("leaving");
             A.utils?.remove?.(fading);  // stop the intro's own animations on these
-            A.animate(fading, { opacity: 0, duration: 300, ease: "outQuad",
+            safeAnimate(fading, { opacity: 0, duration: 300, ease: "outQuad",
                 onComplete: () => fading.forEach((el) => { el.style.opacity = "0"; }) });
-            await finish(A.animate(scene, { scale: 16, duration: 1200, delay: 300, ease: "inOutQuart" }), 2200);
+            await finish(safeAnimate(scene, { scale: 16, duration: 1200, delay: 300, ease: "inOutQuart" }), 2200);
         }
         await ready;
         portal.remove();
