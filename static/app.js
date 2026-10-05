@@ -264,7 +264,10 @@ async function loadConditions() {
         $("#now").textContent = `${c.temp_f}°F in ${c.location} right now · feels ${c.feels_like_f}°F · wind ${c.wind_mph} mph`;
         const portalTemp = $("#portal-temp");
         if (portalTemp) portalTemp.textContent = `${c.temp_f}°F · ${c.location}`;
+        const isNight = c.is_day === false;
+        document.documentElement.dataset.theme = isNight ? "dark" : "light";
         window.Sky?.set({
+            night: isNight,
             mode: c.snow ? "snow" : c.rain ? "rain" : "calm",
             warmth: (c.temp_f - 15) / 65,
             wind: c.wind_mph / 25,

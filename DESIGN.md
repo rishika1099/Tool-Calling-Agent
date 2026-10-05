@@ -3,11 +3,11 @@
 ## Direction
 A live sky behind frosted-glass panels. The weather is the backdrop: clear and blue on warm days,
 paler when it's cold, heavy slate clouds with rain or snow falling when the forecast says so, and a
-night sky in dark mode. On top: editorial type (Fraunces, variable weight) and a warm orange accent
+starry night sky (with the whole page in its night colors) once the sun has set in New York. On top: editorial type (Fraunces, variable weight) and a warm orange accent
 that stands out against the blue.
 
 ## Tokens (in `static/style.css`)
-| Token | Day | Night | Use |
+| Token | Day | Night (`data-theme="dark"`, set from real sunrise/sunset) | Use |
 |---|---|---|---|
 | `--ink` | `#0e1a2b` | `#eef2f8` | text |
 | `--glass` / `--glass-strong` | white 70% / 88% | navy 60% / 80% | panels, inputs |

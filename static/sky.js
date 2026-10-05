@@ -8,7 +8,7 @@
 // Other scripts steer it with Sky.set({ mode: "calm" | "rain" | "snow", warmth: 0..1, wind: 0..1 }).
 (function () {
     const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-    const darkQuery = window.matchMedia("(prefers-color-scheme: dark)");
+    let night = document.documentElement.dataset.theme === "dark";  // real day/night, set by app.js
     const RENDER_SCALE = 0.6; // clouds are soft, so render small and let CSS scale up
 
     // ---------- Weather -> sky look ----------
@@ -33,7 +33,6 @@
     const mixRgb = (a, b, k) => a.map((v, i) => lerp(v, b[i], k));
 
     function targetColors() {
-        const night = darkQuery.matches;
         const L = (name) => LOOKS[night ? `night${name[0].toUpperCase()}${name.slice(1)}` : name];
         let look;
         if (goal.mode === "rain") look = L("rain");
@@ -196,10 +195,25 @@ void main(){
         const n = goal.mode === "rain" ? 220 : goal.mode === "snow" ? 160 : 0;
         particles = Array.from({ length: Math.round(n * area) }, () => spawn(true));
     }
+    // Stars for clear nights: fixed positions, each twinkling at its own pace.
+    const stars = Array.from({ length: 150 }, () => ({ x: Math.random(), y: Math.random() * 0.75, r: 0.4 + Math.random() * 1.1, phase: Math.random() * 6.28 }));
+    function drawStars(t) {
+        const clear = Math.max(0, 1 - now.coverage * 1.05);  // fewer stars under heavy cloud
+        if (!night || clear <= 0) return;
+        for (const s of stars) {
+            const twinkle = 0.55 + 0.45 * Math.sin(t * 0.0015 + s.phase);
+            pctx.fillStyle = `rgba(235,240,255,${(0.9 * twinkle * clear).toFixed(3)})`;
+            pctx.beginPath();
+            pctx.arc(s.x * w, s.y * h, s.r, 0, Math.PI * 2);
+            pctx.fill();
+        }
+    }
+
     function drawPrecip(dt, t) {
         pctx.clearRect(0, 0, w, h);
+        drawStars(t);
         const lean = now.wind * 7;
-        const color = darkQuery.matches ? "220,230,245" : "255,255,255";
+        const color = night ? "220,230,245" : "255,255,255";
         for (const p of particles) {
             if (goal.mode === "rain") {
                 p.y += (11 + 11 * p.z) * dt;
@@ -310,10 +324,10 @@ void main(){
     document.addEventListener("pointerleave", () => { pointer.inside = false; });
     window.addEventListener("resize", () => { size(); if (reduce) still(); });
     document.addEventListener("visibilitychange", () => (document.hidden ? stop() : start()));
-    darkQuery.addEventListener("change", () => { if (reduce) still(); });
 
     window.Sky = {
-        set({ mode, warmth, wind } = {}) {
+        set({ mode, warmth, wind, night: isNight } = {}) {
+            if (isNight != null) night = !!isNight;
             if (warmth != null) goal.warmth = Math.max(0, Math.min(1, warmth));
             if (wind != null) goal.wind = Math.max(0, Math.min(1, wind));
             if (mode && mode !== goal.mode) {

@@ -94,7 +94,7 @@ def current_conditions(location: str = "New York") -> dict:
         params={
             "latitude": place["latitude"],
             "longitude": place["longitude"],
-            "current": "temperature_2m,apparent_temperature,precipitation,rain,snowfall,wind_speed_10m",
+            "current": "temperature_2m,apparent_temperature,precipitation,rain,snowfall,wind_speed_10m,is_day",
             "wind_speed_unit": "ms",
             "timezone": "auto",
         },
@@ -107,6 +107,7 @@ def current_conditions(location: str = "New York") -> dict:
         "wind_mph": to_mph(now["wind_speed_10m"]),
         "rain": now["rain"] > 0 or (now["precipitation"] > 0 and now["snowfall"] == 0),
         "snow": now["snowfall"] > 0,
+        "is_day": bool(now.get("is_day", 1)),  # from the sun's position, not the user's dark-mode setting
     }
 
 

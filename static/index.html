@@ -8,6 +8,10 @@
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght,SOFT@9..144,200..900,0..100&family=Inter:wght@400;500;600&family=Geist+Mono:wght@400;500&display=swap" rel="stylesheet" />
+    <script>
+        // First guess from the clock; corrected from real sunrise/sunset when the weather loads.
+        (function () { var h = new Date().getHours(); document.documentElement.dataset.theme = h < 6 || h >= 19 ? "dark" : "light"; })();
+    </script>
     <link rel="stylesheet" href="/static/style.css" />
 </head>
 <body>
