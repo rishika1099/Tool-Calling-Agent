@@ -11,6 +11,7 @@ from . import style
 from .catalog import INDOOR_SLOTS, clo, is_windproof, keeps_rain_out, slot, wear_limit, wet_retention
 
 UNDERWEAR_CLO = 0.04  # assumed, not tracked in the closet
+SHORT_JACKETS = {"denim_jacket", "bomber_jacket", "leather_jacket"}
 OCCASIONS = {"everyday": 1, "class": 1, "date": 2, "dinner": 2, "party": 2, "work": 2, "interview": 3}  # minimum formality
 WINDY_MPH = 12
 WINDPROOF_BONUS = 0.10  # team estimate: a windproof outer layer keeps ~10% more warmth in wind
@@ -43,6 +44,8 @@ def _combos(items: list[dict]):
     ):
         if leg and leg["garment_type"] in TIGHTS and bottom and bottom["garment_type"] not in SKIRTS:
             continue  # tights go under skirts and dresses, not jeans
+        if mid and outer and mid["garment_type"] == "blazer" and outer["garment_type"] in SHORT_JACKETS:
+            continue  # a blazer goes under a coat, not under another short jacket
         yield [x for x in (core, bottom, mid, outer, leg, sock, shoe) if x]
 
 
@@ -90,6 +93,9 @@ def _evaluate(outfit: list[dict], summary: dict, occasion: str) -> dict:
     # Formality of what stays on indoors; each level below the occasion costs a little.
     visible = [i for i in outfit if slot(i) in ("base_top", "bottom", "one_piece", "mid_top")]
     penalty += 0.6 * sum(max(0, OCCASIONS[occasion] - i.get("formality", 1)) for i in visible)
+    # Shoes are seen all day and the coat on the way in, so they count too, at half weight.
+    seen = [i for i in outfit if slot(i) in ("shoes", "outer")]
+    penalty += 0.3 * sum(max(0, OCCASIONS[occasion] - i.get("formality", 1)) for i in seen)
 
     style_result = style.style_score(outfit, occasion)
     if style_result is not None:

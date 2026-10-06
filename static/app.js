@@ -1199,14 +1199,25 @@ function runPortal(setupDone) {
         const ready = startMode(mode);
         if (A) {
             scene.style.transform = "";
-            // The text, frame, pane dividers, curtains and sill fade away first, so only a clean
-            // opening onto the sky grows, not giant white bars.
-            const fading = portal.querySelectorAll(".portal-top, .portal-copy, .portal-foot, .lamp-light, .frame, .muntin, .glare, .sill, .curtain, .rod");
+            // Step outside: the copy fades, the curtains pull right back, the two sashes swing
+            // into the room, and only then do we move through the open window into the sky.
+            const copy = portal.querySelectorAll(".portal-top, .portal-copy, .portal-foot, .lamp-light");
+            const fittings = portal.querySelectorAll(".frame, .sash, .sill, .curtain, .rod");
+            const sashes = portal.querySelectorAll(".sash");
             portal.classList.add("leaving");
-            A.utils?.remove?.(fading);  // stop the intro's own animations on these
-            safeAnimate(fading, { opacity: 0, duration: 300, ease: "outQuad",
-                onComplete: () => fading.forEach((el) => { el.style.opacity = "0"; }) });
-            await finish(safeAnimate(scene, { scale: 16, duration: 1200, delay: 300, ease: "inOutQuart" }), 2200);
+            A.utils?.remove?.([...copy, ...curtains]);  // stop the intro's own animations on these
+            A.animate(copy, { opacity: 0, duration: 350, ease: "outQuad" });
+            A.animate(curtains, { scaleX: 0.14, duration: 800, ease: "inOutCubic" });
+            A.animate(sashes[0], { rotateY: -112, duration: 1000, delay: 150, ease: "inOutCubic" });
+            A.animate(sashes[1], { rotateY: 112, duration: 1000, delay: 230, ease: "inOutCubic" });
+
+            // Zoom just far enough for the opening to cover the screen, about the window's center.
+            const box = portal.querySelector(".window").getBoundingClientRect();
+            const cx = box.left + box.width / 2, cy = box.top + box.height / 2;
+            const zoom = 1.15 * Math.max(cx, window.innerWidth - cx) / (box.width * 0.42);
+            const zoomY = 1.15 * Math.max(cy, window.innerHeight - cy) / (box.height * 0.42);
+            A.animate(fittings, { opacity: 0, duration: 500, delay: 1600, ease: "inQuad" });
+            await finish(A.animate(scene, { scale: Math.max(zoom, zoomY), duration: 1300, delay: 900, ease: "inOutCubic" }), 3000);
         }
         await ready;
         portal.remove();
