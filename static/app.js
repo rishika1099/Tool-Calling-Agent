@@ -1047,6 +1047,7 @@ $("#new-day").addEventListener("click", async () => {
     await fetch(`/clear?session_id=${encodeURIComponent(sessionId)}`, { method: "POST" });
     sessionId = null;
     store("layerlab-session", null);
+    try { sessionStorage.removeItem("layerlab-portal"); } catch (e) { /* fine */ }  // back to the window
     location.reload();
 });
 document.querySelectorAll(".spot").forEach((el) => attachSpotlight(el));
