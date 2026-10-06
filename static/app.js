@@ -353,34 +353,82 @@ function renderSensitivity(level) {
     thumbPlaced = true;
 }
 
+// The closet in sections, with tabs to jump to one.
+const SECTIONS = [
+    ["tops", "Tops", ["base_top"]],
+    ["layers", "Knits & layers", ["mid_top"]],
+    ["outerwear", "Coats & jackets", ["outer"]],
+    ["bottoms", "Bottoms", ["bottom"]],
+    ["dresses", "Dresses", ["one_piece"]],
+    ["shoes", "Shoes", ["shoes"]],
+    ["extras", "Extras", ["legwear", "socks", "head", "neck", "hands"]],
+];
+let closetSection = "all";
+let lastSelected = [];
+
+function closetCell(item, selectedIds) {
+    const cell = document.createElement("div");
+    cell.className = "item-cell";
+    const btn = document.createElement("button");
+    btn.className = `item ${item.status}${selectedIds.includes(item.id) ? " selected" : ""}${item.photo_url ? " has-photo" : ""}`;
+    btn.dataset.id = item.id;
+    const wearNote = item.wear_limit ? ` · worn ${item.wears}/${item.wear_limit}` : "";
+    btn.title = `${item.name}: ${item.status.replace("_", " ")}${wearNote}. Tap to toggle laundry.`;
+    const visual = item.photo_url ? `<img class="photo" src="${item.photo_url}" alt="" loading="lazy">` : garmentSvg(item);
+    btn.innerHTML = `${visual}<div>${escapeHtml(item.name)}</div><span class="clo">${item.clo} clo</span>`;
+    btn.addEventListener("click", () => toggleLaundry(item, btn));
+    attachSpotlight(btn, 14);
+    cell.appendChild(btn);
+    if (item.user_added) {
+        const rm = document.createElement("button");
+        rm.className = "rm";
+        rm.type = "button";
+        rm.setAttribute("aria-label", `Remove ${item.name}`);
+        rm.textContent = "×";
+        rm.addEventListener("click", () => removeItem(item, cell));
+        cell.appendChild(rm);
+    }
+    return cell;
+}
+
 function renderCloset(selectedIds) {
-    const el = $("#closet");
+    lastSelected = selectedIds;
+    const el = $("#closet"), tabs = $("#closet-tabs");
     el.innerHTML = "";
-    // Your own clothes first, then the demo closet.
+    tabs.innerHTML = "";
+    // Your own clothes first within each section, then the demo closet.
     const ordered = [...closetItems].sort((a, b) => (b.user_added ? 1 : 0) - (a.user_added ? 1 : 0));
-    for (const item of ordered) {
-        const cell = document.createElement("div");
-        cell.className = "item-cell";
+    const groups = SECTIONS.map(([key, label, slots]) => ({ key, label, items: ordered.filter((i) => slots.includes(i.slot)) }));
+    const other = ordered.filter((i) => !SECTIONS.some(([, , slots]) => slots.includes(i.slot)));
+    if (other.length) groups[groups.length - 1].items.push(...other);
+    const filled = groups.filter((g) => g.items.length);
+    if (!filled.some((g) => g.key === closetSection)) closetSection = "all";
+
+    for (const tab of [{ key: "all", label: "All", items: ordered }, ...filled]) {
+        if (filled.length < 2 && tab.key !== "all") continue;
         const btn = document.createElement("button");
-        btn.className = `item ${item.status}${selectedIds.includes(item.id) ? " selected" : ""}${item.photo_url ? " has-photo" : ""}`;
-        btn.dataset.id = item.id;
-        const wearNote = item.wear_limit ? ` · worn ${item.wears}/${item.wear_limit}` : "";
-        btn.title = `${item.name}: ${item.status.replace("_", " ")}${wearNote}. Tap to toggle laundry.`;
-        const visual = item.photo_url ? `<img class="photo" src="${item.photo_url}" alt="" loading="lazy">` : garmentSvg(item);
-        btn.innerHTML = `${visual}<div>${escapeHtml(item.name)}</div><span class="clo">${item.clo} clo</span>`;
-        btn.addEventListener("click", () => toggleLaundry(item, btn));
-        attachSpotlight(btn, 14);
-        cell.appendChild(btn);
-        if (item.user_added) {
-            const rm = document.createElement("button");
-            rm.className = "rm";
-            rm.type = "button";
-            rm.setAttribute("aria-label", `Remove ${item.name}`);
-            rm.textContent = "×";
-            rm.addEventListener("click", () => removeItem(item, cell));
-            cell.appendChild(rm);
+        btn.type = "button";
+        btn.setAttribute("role", "tab");
+        btn.setAttribute("aria-selected", String(tab.key === closetSection));
+        btn.innerHTML = `${tab.label} <span>${tab.items.length}</span>`;
+        btn.addEventListener("click", () => { closetSection = tab.key; renderCloset(lastSelected); });
+        tabs.appendChild(btn);
+    }
+    tabs.hidden = filled.length < 2;
+
+    for (const group of filled) {
+        if (closetSection !== "all" && closetSection !== group.key) continue;
+        const section = document.createElement("section");
+        section.className = "closet-section";
+        if (closetSection === "all" && filled.length > 1) {
+            const worn = group.items.filter((i) => selectedIds.includes(i.id)).length;
+            section.innerHTML = `<h3>${group.label} <span>${group.items.length}${worn ? ` · ${worn} in today's outfit` : ""}</span></h3>`;
         }
-        el.appendChild(cell);
+        const grid = document.createElement("div");
+        grid.className = "closet-grid";
+        for (const item of group.items) grid.appendChild(closetCell(item, selectedIds));
+        section.appendChild(grid);
+        el.appendChild(section);
     }
     if (!closetShown && closetItems.length) {
         closetShown = true;

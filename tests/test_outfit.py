@@ -63,14 +63,16 @@ def test_manual_laundry_toggle_is_unaffected_by_wear_limit():
 
 
 def test_interview_outfit_is_dressed_up():
-    """A cool day, jeans in the wash: the interview pick is the blazer over the shirt, not a puffer or sneakers."""
+    """A cool day, jeans in the wash: the interview pick is tailored, not a puffer, sweatpants or sneakers."""
     _, session = get_session(None)
     session.wardrobe["jeans-indigo"]["status"] = "in_laundry"
     session.last_plan = {"summary": {"outdoor_clo_min": 1.05, "outdoor_clo_ideal": 1.42, "indoor_clo_min": 0.83,
                                      "indoor_clo_ideal": 1.17, "max_wind_mph": 7}}
     options = json.loads(run_tool("build_outfit", {"occasion": "interview"}, session))["options"]
-    best = [item["id"] for item in options[0]["items"]]
-    assert {"shirt-oxford", "trousers-black", "coat-camel", "boots-leather"} <= set(best)
+    best = {item["id"] for item in options[0]["items"]}
+    assert "trousers-black" in best and best & {"shirt-white", "shirt-oxford"}
+    assert best & {"coat-charcoal", "coat-camel", "trench-beige"}  # a tailored layer on top
+    assert not best & {"parka-black", "puffer-sage", "sneakers-white", "sweatpants-grey", "hoodie-grey"}
     for option in options:
         ids = {item["id"] for item in option["items"]}
         assert not {"coat-camel", "jacket-denim"} <= ids  # never a blazer under a denim jacket

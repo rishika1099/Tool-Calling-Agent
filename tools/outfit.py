@@ -97,6 +97,10 @@ def _evaluate(outfit: list[dict], summary: dict, occasion: str) -> dict:
     seen = [i for i in outfit if slot(i) in ("shoes", "outer")]
     penalty += 0.3 * sum(max(0, OCCASIONS[occasion] - i.get("formality", 1)) for i in seen)
 
+    # Sweatpants and hoodies are for days with nothing on; anywhere else they are a last resort.
+    if occasion != "everyday":
+        penalty += 0.4 * sum(1 for i in outfit if i["garment_type"] in style.LOUNGE)
+
     style_result = style.style_score(outfit, occasion)
     if style_result is not None:
         penalty += (10 - style_result["score"]) * 0.15
