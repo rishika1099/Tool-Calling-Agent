@@ -6,6 +6,7 @@ from scan_garment, and the style score from style.style_score.
 
 import itertools
 import json
+from collections import Counter
 
 from . import style
 from .catalog import INDOOR_SLOTS, clo, is_windproof, keeps_rain_out, slot, wear_limit, wet_retention
@@ -150,9 +151,11 @@ def build_outfit(session, occasion: str = "class", must_include: list[str] | Non
     from every item (every slot, not just the hygiene-sensitive ones) most recently picked for a
     *different* for_whom this session, so two people asked about in the same answer don't both get
     offered the identical physical item - coat or shoes included - before either has actually
-    claimed anything with update_wardrobe. This is a soft preference, not a hard rule, and backs
-    off automatically if honoring it would leave no outfit at all. Omit for a single user; nothing
-    changes for that case.
+    claimed anything with update_wardrobe. This only kicks in once every owned unit of that item
+    is already claimed this way: owning 2 of something (set from the closet panel) means two
+    people can legitimately both get offered it. This is a soft preference, not a hard rule, and
+    backs off automatically if honoring it would leave no outfit at all. Omit for a single user;
+    nothing changes for that case.
     """
     plan = session.last_plan
     if not plan:
@@ -174,8 +177,15 @@ def build_outfit(session, occasion: str = "class", must_include: list[str] | Non
                if i["status"] != "in_laundry" and _claimed_by_someone_else(i)]
     summary = plan["summary"]
 
-    recent_elsewhere = [iid for who, ids in session.recent_picks.items()
-                         if for_whom and who.strip().lower() != for_whom.strip().lower() for iid in ids]
+    # Only soft-avoid an item once every owned unit is already claimed by someone else's recent
+    # pick: owning 2 pairs of the same boots means two people genuinely can get offered "the same
+    # boots" without it being a physical conflict, so count claims against qty rather than
+    # excluding on the first match.
+    elsewhere_claims = Counter(
+        iid for who, ids in session.recent_picks.items()
+        if for_whom and who.strip().lower() != for_whom.strip().lower() for iid in ids)
+    recent_elsewhere = [iid for iid, claims in elsewhere_claims.items()
+                         if claims >= session.wardrobe.get(iid, {}).get("qty", 1)]
 
     def _score(soft_avoid: list[str]):
         avoid = set(exclude) | set(soft_avoid)

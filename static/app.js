@@ -61,7 +61,13 @@ function escapeHtml(text) {
 // own details indented under it, and the model's own section headers (e.g. "### Today") need
 // somewhere to go other than literal "###" text in the middle of a chat bubble.
 function renderMarkdown(text) {
-    const inline = (s) => escapeHtml(s).replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>");
+    // Bold first, then italic: by the time the italic pass runs, every ** pair is already
+    // consumed into <strong>, so any * left really is a single-asterisk italic marker, not the
+    // first half of a ** that got mis-split. Without this, a reply using *italic* (e.g. a quiet
+    // aside in parentheses) showed the literal asterisks instead of being styled.
+    const inline = (s) => escapeHtml(s)
+        .replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>")
+        .replace(/\*(.+?)\*/g, "<em>$1</em>");
     const html = [];
     let topItems = null; // open top-level <li> strings for the current list
     let subItems = null; // open nested <li> strings for the current top-level item

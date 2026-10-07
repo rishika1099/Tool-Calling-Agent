@@ -274,6 +274,27 @@ def test_build_outfit_steers_a_different_for_whom_away_from_the_same_items():
     assert not (me_ids & alex_ids)  # no shared item at all between the two same-session picks
 
 
+def test_build_outfit_allows_sharing_an_item_owned_in_multiples():
+    # Owning 2 of something (set from the closet panel) means two people can legitimately both
+    # get offered it - the soft avoid-duplicate check should only kick in once every owned unit
+    # is already claimed, not on the first match. boots-leather is made the only available shoe
+    # so a wrongly-excluded version of this would show up as a missing shoe, not an error (shoes
+    # aren't a required slot), making the difference directly observable without must_include
+    # (which would mask it: an empty scored list falls back to ignoring the avoid-set entirely).
+    _, session = get_session(None)
+    session.last_plan = SHARED_PLAN
+    session.wardrobe["boots-leather"]["qty"] = 2
+    for item in session.wardrobe.values():
+        if slot(item) == "shoes" and item["id"] != "boots-leather":
+            item["status"] = "in_laundry"
+
+    me = json.loads(run_tool("build_outfit", {"for_whom": "me"}, session))
+    assert "boots-leather" in {i["id"] for i in me["options"][0]["items"]}
+
+    alex = json.loads(run_tool("build_outfit", {"for_whom": "Alex"}, session))
+    assert "boots-leather" in {i["id"] for i in alex["options"][0]["items"]}
+
+
 def test_build_outfit_overlap_avoidance_backs_off_when_nothing_else_is_available():
     # If honoring the soft avoidance would leave no outfit at all, it's dropped rather than
     # failing the call outright - a small closet shouldn't hard-break over a soft preference.
