@@ -196,3 +196,14 @@ def test_demo_closet_photos_exist_and_are_served():
         assert (app_module.STATIC / item["photo_url"].removeprefix("/static/")).is_file(), item["id"]
     assert client.get(with_photo[0]["photo_url"]).headers["content-type"] == "image/jpeg"
     assert all((app_module.STATIC / i["photo"]).is_file() for i in items if i.get("photo"))
+
+
+def test_adding_the_same_extra_again_counts_it_instead_of_duplicating():
+    _, session = get_session(None)
+    tights = {"name": "Black fishnet tights", "garment_type": "tights"}
+    first = wardrobe.add_item(session, dict(tights))
+    again = wardrobe.add_item(session, {**tights, "name": "black fishnet tights"})
+    assert again is first and first["qty"] == 2
+    assert sum(1 for i in session.wardrobe.values() if i["garment_type"] == "tights" and i.get("user_added")) == 1
+    tee = {"name": "White tee", "garment_type": "t_shirt"}
+    assert wardrobe.add_item(session, dict(tee)) is not wardrobe.add_item(session, dict(tee))  # only extras merge

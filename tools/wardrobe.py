@@ -139,6 +139,9 @@ def analyze_garment(session, photo_id: str, label_photo_id: str | None = None) -
     }
 
 
+MULTIPLES = {"socks", "legwear", "head", "neck", "hands"}  # things people own several of
+
+
 def add_item(session, fields: dict) -> dict:
     """Validate item fields (from a scan or the form) and save them to the closet."""
     garment_type = fields.get("garment_type")
@@ -155,6 +158,14 @@ def add_item(session, fields: dict) -> dict:
     if not (isinstance(color, str) and re.fullmatch(r"#[0-9a-fA-F]{6}", color)):
         color = main_color(session.images[photo_id][0]) if photo_id else "#9a9a9a"
     name = _clean_name(fields.get("name"), garment_type)
+    # Adding the same sock, tight, glove, hat or scarf again means "I own another one":
+    # count it on the existing card instead of making a duplicate.
+    if GARMENTS[garment_type]["slot"] in MULTIPLES:
+        for owned in session.wardrobe.values():
+            if owned.get("user_added") and owned["garment_type"] == garment_type and owned["name"].lower() == name.lower():
+                owned["qty"] = owned.get("qty", 1) + 1
+                owned["status"] = "clean"  # the new one is clean, so at least one is available
+                return owned
     item_id = f"{re.sub(r'[^a-z0-9]+', '-', name.lower()).strip('-')[:24]}-{secrets.token_hex(2)}"
     formality = fields.get("formality")
     item = {

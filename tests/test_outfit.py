@@ -271,7 +271,9 @@ def test_build_outfit_steers_a_different_for_whom_away_from_the_same_items():
 
     alex = json.loads(run_tool("build_outfit", {"for_whom": "Alex"}, session))
     alex_ids = {i["id"] for i in alex["options"][0]["items"]}
-    assert not (me_ids & alex_ids)  # no shared item at all between the two same-session picks
+    # No single-copy item is shared between the two picks. Pieces owned in multiples (the demo
+    # closet has several pairs of socks) can go to both people.
+    assert not {i for i in me_ids & alex_ids if session.wardrobe[i]["qty"] == 1}
 
 
 def test_recent_picks_keeps_a_separate_entry_per_day_not_just_per_person():

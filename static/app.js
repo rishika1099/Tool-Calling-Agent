@@ -438,7 +438,7 @@ function closetCell(item, selectedIds) {
     if (item.worn_by) tags.push(`<span class="tag tag-person">${escapeHtml(item.worn_by)}</span>`);
     if (item.worn_for) tags.push(`<span class="tag tag-day">${escapeHtml(item.worn_for)}</span>`);
     const tagRow = tags.length ? `<div class="item-tags">${tags.join("")}</div>` : "";
-    const qtyBadge = qty > 1 ? `<span class="qty-note">${qty - dirty}/${qty} avail${dirty ? ` · ${dirty} laundry` : ""}</span>` : "";
+    const qtyBadge = qty > 1 ? `<span class="qty-note">${dirty ? `${qty - dirty} of ${qty} clean` : `own ${qty}`}</span>` : "";
     btn.innerHTML = `${tagRow}${visual}<div>${escapeHtml(item.name)}</div>${qtyBadge}<span class="clo">${item.clo} clo</span>`;
     btn.addEventListener("click", () => toggleLaundry(item, btn));
     attachSpotlight(btn, 14);
