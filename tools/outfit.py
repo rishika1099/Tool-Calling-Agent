@@ -210,36 +210,16 @@ def list_wardrobe(session, slot_filter: str | None = None) -> str:
     """Compact view of the closet so the model can refer to item ids."""
     items = [
         {"id": i["id"], "name": i["name"], "slot": slot(i), "clo": clo(i), "status": i["status"],
-         "wears": i["wears"], "wear_limit": wear_limit(i), "worn_by": i.get("worn_by"),
-         "qty": i.get("qty", 1), "qty_in_laundry": i.get("qty_in_laundry", 0)}
+         "wears": i["wears"], "wear_limit": wear_limit(i), "worn_by": i.get("worn_by")}
         for i in session.wardrobe.values()
         if slot_filter in (None, slot(i))
     ]
     return json.dumps({"count": len(items), "items": items})
 
 
-def sync_laundry_status(item: dict) -> None:
-    """Recompute status from qty/qty_in_laundry/wears after either changes.
-
-    status == "in_laundry" only once nothing is available (qty_in_laundry >= qty); that is
-    exactly what build_outfit's availability filter and the closet's "in laundry" styling
-    already key off, so keeping status in sync here means neither needs to know qty exists.
-    """
-    qty = item.get("qty", 1)
-    dirty = item.get("qty_in_laundry", 0)
-    item["status"] = "in_laundry" if dirty >= qty else "worn" if item["wears"] > 0 else "clean"
-    if item["status"] != "worn":
-        item["worn_by"] = None
-
-
 def update_wardrobe(session, item_ids: list[str], status: str, worn_by: str | None = None) -> str:
     """Mark items clean, worn, or in the laundry. A 'worn' item that reaches its wear limit
-    (garments.csv, e.g. a t-shirt is 1, a coat is 10) sends one unit to the laundry automatically;
-    for an item owned more than once (qty > 1, set from the closet panel), only that one unit
-    goes, not the whole item. Repeated 'worn' calls past the limit each dirty one more unit.
-    status="in_laundry" also sends one more unit each call; status="clean" is a full restock
-    (qty_in_laundry back to 0), matching "the laundry is done" rather than "undo one item" (the
-    closet panel's own laundry-count controls handle undoing a single accidental tap).
+    (garments.csv, e.g. a t-shirt is 1, a coat is 10) goes to the laundry automatically.
 
     worn_by optionally labels who is wearing the item today (e.g. "me" or a friend's name), for a
     closet shared by more than one person. It only takes effect alongside status="worn", and only
@@ -256,22 +236,22 @@ def update_wardrobe(session, item_ids: list[str], status: str, worn_by: str | No
     updated, needs_laundry = [], []
     for item_id in item_ids:
         item = session.wardrobe[item_id]
-        qty = item.get("qty", 1)
         if status == "worn":
             item["wears"] += 1
             if item["wears"] >= wear_limit(item):
-                item["qty_in_laundry"] = min(qty, item.get("qty_in_laundry", 0) + 1)
+                item["status"] = "in_laundry"
                 needs_laundry.append(item["name"])
+            else:
+                item["status"] = "worn"
         elif status == "clean":
-            item["qty_in_laundry"] = 0
             item["wears"] = 0
-        else:  # "in_laundry": one more unit goes to the wash, same action as a laundry-panel tap
-            item["qty_in_laundry"] = min(qty, item.get("qty_in_laundry", 0) + 1)
-        sync_laundry_status(item)
+            item["status"] = "clean"
+        else:
+            item["status"] = status
         item["worn_by"] = worn_by.strip()[:40] if (
             isinstance(worn_by, str) and worn_by.strip() and item["status"] == "worn") else None
         updated.append({"id": item_id, "name": item["name"], "status": item["status"], "wears": item["wears"],
-                         "worn_by": item["worn_by"], "qty": qty, "qty_in_laundry": item["qty_in_laundry"]})
+                         "worn_by": item["worn_by"]})
     result = {"updated": updated}
     if needs_laundry:
         result["note"] = f"{', '.join(needs_laundry)} hit the wear limit and went straight to the laundry."

@@ -380,37 +380,14 @@ function closetCell(item, selectedIds) {
     btn.className = `item ${item.status}${selectedIds.includes(item.id) ? " selected" : ""}${item.photo_url ? " has-photo" : ""}`;
     btn.dataset.id = item.id;
     if (item.worn_by) btn.dataset.wornBy = item.worn_by;
-    const qty = item.qty ?? 1, dirty = item.qty_in_laundry ?? 0;
     const wearNote = item.wear_limit ? ` · worn ${item.wears}/${item.wear_limit}` : "";
     const wornByNote = item.worn_by ? ` · worn by ${item.worn_by} right now` : "";
-    const tapNote = qty > 1 ? ` Tap to send 1 to the laundry.` : ` Tap to toggle laundry.`;
-    btn.title = `${item.name}: ${item.status.replace("_", " ")}${wearNote}${wornByNote}.${tapNote}`;
+    btn.title = `${item.name}: ${item.status.replace("_", " ")}${wearNote}${wornByNote}. Tap to toggle laundry.`;
     const visual = item.photo_url ? `<img class="photo" src="${item.photo_url}" alt="" loading="lazy">` : garmentSvg(item);
-    const qtyBadge = qty > 1 ? `<span class="qty-note">${qty - dirty}/${qty} avail${dirty ? ` · ${dirty} laundry` : ""}</span>` : "";
-    btn.innerHTML = `${visual}<div>${escapeHtml(item.name)}</div>${qtyBadge}<span class="clo">${item.clo} clo</span>`;
+    btn.innerHTML = `${visual}<div>${escapeHtml(item.name)}</div><span class="clo">${item.clo} clo</span>`;
     btn.addEventListener("click", () => toggleLaundry(item, btn));
     attachSpotlight(btn, 14);
     cell.appendChild(btn);
-
-    const stepper = document.createElement("div");
-    stepper.className = "qty-stepper";
-    stepper.innerHTML = `<button type="button" class="qty-dec" aria-label="Own fewer ${escapeHtml(item.name)}">−</button>
-        <span class="qty-val">${qty}</span>
-        <button type="button" class="qty-inc" aria-label="Own more ${escapeHtml(item.name)}">+</button>`;
-    stepper.querySelector(".qty-dec").addEventListener("click", (e) => { e.stopPropagation(); setQty(item, Math.max(1, qty - 1)); });
-    stepper.querySelector(".qty-inc").addEventListener("click", (e) => { e.stopPropagation(); setQty(item, qty + 1); });
-    cell.appendChild(stepper);
-
-    if (qty > 1 && dirty > 0) {
-        const undo = document.createElement("button");
-        undo.type = "button";
-        undo.className = "laundry-undo";
-        undo.setAttribute("aria-label", `Take one ${item.name} out of the laundry`);
-        undo.textContent = "−";
-        undo.addEventListener("click", (e) => { e.stopPropagation(); unlaundry(item); });
-        cell.appendChild(undo);
-    }
-
     if (item.user_added) {
         const rm = document.createElement("button");
         rm.className = "rm";
@@ -476,31 +453,12 @@ async function removeItem(item, cell) {
 }
 
 async function toggleLaundry(item, btn) {
-    const qty = item.qty ?? 1;
-    const status = qty > 1 ? "in_laundry" : (item.status === "in_laundry" ? "clean" : "in_laundry");
+    const status = item.status === "in_laundry" ? "clean" : "in_laundry";
     if (A) await finish(safeAnimate(btn, { scale: [1, 0.9, 1], duration: 380, ease: "outQuad" }), 600);
     await fetch("/wardrobe/status", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ session_id: sessionId, item_ids: [item.id], status }),
-    });
-    await refresh();
-}
-
-async function setQty(item, qty) {
-    await fetch("/wardrobe/qty", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ session_id: sessionId, item_id: item.id, qty }),
-    });
-    await refresh();
-}
-
-async function unlaundry(item) {
-    await fetch("/wardrobe/unlaundry", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ session_id: sessionId, item_id: item.id }),
     });
     await refresh();
 }
