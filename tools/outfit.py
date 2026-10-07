@@ -145,7 +145,12 @@ def build_outfit(session, occasion: str = "class", must_include: list[str] | Non
     (and, once laundered, each needs their own wash, not a pass straight to someone else).
     This only applies to garments worn directly against skin (tops, bottoms, dresses, legwear,
     socks) for hygiene; outerwear, mid-layers, shoes and accessories stay available to everyone
-    regardless of who currently has them on. Omit for a single user; nothing changes for that case.
+    regardless of who currently has them on. for_whom also steers this pick away from whatever
+    top/bottom/dress/legwear/socks was most recently picked for a *different* for_whom this
+    session, so two people asked about in the same answer don't both get offered the identical
+    physical garment before either has actually claimed anything with update_wardrobe; this is a
+    soft preference, not a hard rule, and backs off automatically if honoring it would leave no
+    outfit at all. Omit for a single user; nothing changes for that case.
     """
     plan = session.last_plan
     if not plan:
@@ -162,20 +167,32 @@ def build_outfit(session, occasion: str = "class", must_include: list[str] | Non
             return False
         return str(item["worn_by"]).strip().lower() != str(for_whom).strip().lower()
 
-    available = [i for i in session.wardrobe.values()
-                 if i["status"] != "in_laundry" and i["id"] not in exclude and not _claimed_by_someone_else(i)]
     laundry = [i["name"] for i in session.wardrobe.values() if i["status"] == "in_laundry"]
     claimed = [i["name"] for i in session.wardrobe.values()
                if i["status"] != "in_laundry" and _claimed_by_someone_else(i)]
-    wearable = [i for i in available if slot(i) not in ("head", "hands", "neck")]
-    accessories = [i for i in available if slot(i) in ("head", "hands", "neck")]
-
     summary = plan["summary"]
-    scored = []
-    for outfit in _combos(wearable):
-        ids = {i["id"] for i in outfit}
-        if all(m in ids for m in must_include if slot(session.wardrobe[m]) not in ("head", "hands", "neck")):
-            scored.append((_evaluate(outfit, summary, occasion), outfit))
+
+    recent_elsewhere = [iid for who, ids in session.recent_picks.items()
+                         if for_whom and who.strip().lower() != for_whom.strip().lower() for iid in ids]
+
+    def _score(soft_avoid: list[str]):
+        avoid = set(exclude) | set(soft_avoid)
+        available = [i for i in session.wardrobe.values()
+                     if i["status"] != "in_laundry" and i["id"] not in avoid and not _claimed_by_someone_else(i)]
+        wearable = [i for i in available if slot(i) not in ("head", "hands", "neck")]
+        accessories = [i for i in available if slot(i) in ("head", "hands", "neck")]
+        scored = []
+        for outfit in _combos(wearable):
+            ids = {i["id"] for i in outfit}
+            if all(m in ids for m in must_include if slot(session.wardrobe[m]) not in ("head", "hands", "neck")):
+                scored.append((_evaluate(outfit, summary, occasion), outfit))
+        return scored, accessories
+
+    scored, accessories = _score(recent_elsewhere)
+    if not scored and recent_elsewhere:
+        # Honoring the soft same-session overlap avoidance left nothing: a small closet shouldn't
+        # hard-fail over a preference, so retry without it.
+        scored, accessories = _score([])
     if not scored:
         return json.dumps({"error": "No complete outfit is available. The closet needs at least a top and a bottom "
                                     "(or a dress) that are not in the laundry and not excluded."})
@@ -202,6 +219,8 @@ def build_outfit(session, occasion: str = "class", must_include: list[str] | Non
             break
 
     session.last_outfit = [i["id"] for i in options[0]["items"]]
+    if for_whom:
+        session.recent_picks[for_whom] = [i["id"] for i in options[0]["items"] if i["slot"] in HYGIENE_SLOTS]
     return json.dumps({
         "targets": {k: summary.get(k) for k in ("indoor_clo_min", "indoor_clo_ideal", "outdoor_clo_min", "outdoor_clo_ideal")},
         "options": options,
@@ -303,8 +322,10 @@ TOOLS = [
                 "Pick the best outfits from the user's closet for the most recent plan_day_warmth result. "
                 "Skips items in the laundry, checks warmth indoors and outdoors, accounts for rain and wind, "
                 "and adds gloves/hat/scarf if needed. Returns up to 3 ranked options. "
-                "Always call plan_day_warmth first. For a shared closet, pass for_whom so one person's "
-                "current pick isn't offered to someone else."
+                "Always call plan_day_warmth first. For a shared closet, pass for_whom: a top, bottom, dress, "
+                "legwear or sock someone else already has on is left out, and this call also automatically "
+                "steers away from whatever skin-touching items a different for_whom was most recently picked "
+                "for this session, even before anything is confirmed with update_wardrobe."
             ),
             "parameters": {
                 "type": "object",
