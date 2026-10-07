@@ -18,6 +18,7 @@ from session import BORROW, ESSENTIALS, Session, demo_wardrobe
 from settings import MODEL, MODEL_RETRIES, MODEL_TIMEOUT, VERTEX_LOCATION
 from tools import TOOLS, run_tool
 from tools.catalog import GARMENTS, MATERIALS, clo, slot, wear_limit
+from tools.outfit import sync_laundry_status
 from tools.photos import PhotoError, open_image
 from tools.wardrobe import FITS, PATTERNS, RAIN, GarmentScanError, add_item, analyze_garment
 from tools.forecast import current_conditions
@@ -199,6 +200,17 @@ class StatusRequest(BaseModel):
     session_id: str
     item_ids: list[str]
     status: str
+
+
+class QtyRequest(BaseModel):
+    session_id: str
+    item_id: str
+    qty: int
+
+
+class UnlaundryRequest(BaseModel):
+    session_id: str
+    item_id: str
 
 
 class ScanRequest(BaseModel):
@@ -386,6 +398,34 @@ def wardrobe_status(request: StatusRequest):
     if "error" in result:
         raise HTTPException(400, result["error"])
     return result
+
+
+@app.post("/wardrobe/qty")
+def wardrobe_qty(request: QtyRequest):
+    """UI-only: how many of this item the user owns. Lowering it below the current dirty
+    count clamps the dirty count down to match (you can't own fewer than are in the wash)."""
+    _, session = get_session(request.session_id)
+    item = session.wardrobe.get(request.item_id)
+    if not item:
+        raise HTTPException(404, "Unknown item id.")
+    item["qty"] = max(1, int(request.qty))
+    item["qty_in_laundry"] = min(item.get("qty_in_laundry", 0), item["qty"])
+    sync_laundry_status(item)
+    return {"id": item["id"], "qty": item["qty"], "qty_in_laundry": item["qty_in_laundry"], "status": item["status"]}
+
+
+@app.post("/wardrobe/unlaundry")
+def wardrobe_unlaundry(request: UnlaundryRequest):
+    """UI-only: undo one accidental "send to laundry" tap. Decrements qty_in_laundry by 1
+    (floor 0); unlike update_wardrobe's "clean", this never touches wears, since undoing a
+    laundry-send isn't the same as declaring the item freshly washed."""
+    _, session = get_session(request.session_id)
+    item = session.wardrobe.get(request.item_id)
+    if not item:
+        raise HTTPException(404, "Unknown item id.")
+    item["qty_in_laundry"] = max(0, item.get("qty_in_laundry", 0) - 1)
+    sync_laundry_status(item)
+    return {"id": item["id"], "qty": item["qty"], "qty_in_laundry": item["qty_in_laundry"], "status": item["status"]}
 
 
 @app.post("/profile")
