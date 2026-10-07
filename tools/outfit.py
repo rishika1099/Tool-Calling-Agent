@@ -267,7 +267,9 @@ def update_wardrobe(session, item_ids: list[str], status: str, worn_by: str | No
     goes, not the whole item. Repeated 'worn' calls past the limit each dirty one more unit.
     status="in_laundry" also sends one more unit each call; status="clean" is a full restock
     (qty_in_laundry back to 0), matching "the laundry is done" rather than "undo one item" (the
-    closet panel's own laundry-count controls handle undoing a single accidental tap).
+    closet panel's own laundry-count controls handle undoing a single accidental tap). A separate
+    lifetime_wears counter also increments on every "worn" call and is never reset by "clean" or
+    anything else, unlike wears (which tracks the current wash cycle); wardrobe_stats reads it.
 
     worn_by optionally labels who is wearing the item today (e.g. "me" or a friend's name), for a
     closet shared by more than one person. worn_for optionally labels which day it's set aside for
@@ -290,6 +292,7 @@ def update_wardrobe(session, item_ids: list[str], status: str, worn_by: str | No
         qty = item.get("qty", 1)
         if status == "worn":
             item["wears"] += 1
+            item["lifetime_wears"] = item.get("lifetime_wears", 0) + 1
             if item["wears"] >= wear_limit(item):
                 item["qty_in_laundry"] = min(qty, item.get("qty_in_laundry", 0) + 1)
                 needs_laundry.append(item["name"])

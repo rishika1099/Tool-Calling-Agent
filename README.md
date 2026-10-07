@@ -50,6 +50,9 @@ Each piece has an AI-generated product-style photo (an illustration of the demo 
 | `scan_garment` | Shreya | Adds clothes from a photo with Gemini vision, reading the care label for the exact fiber mix; every field is validated against fixed lists. Sample photos: `data/demo_photos/` |
 | `style_check` | Kshamaa | Scores whether an outfit goes together: color, shape, pattern, occasion |
 | `try_on_outfit` | Rishika | Shows the user wearing the outfit: one generated image from their photo, their garment photos and the outfit list (Gemini image model on Vertex AI) |
+| `suggest_wardrobe_gaps` | Shreya | Flags closet coverage gaps against the current plan: a missing waterproof or windproof coat, no shoes at all, or not enough warmth available even stacking every layer. Reasons about what's missing, not just what to pick |
+| `plan_laundry` | Shreya | How many clean units are left in each clothing category and which are running low, so laundry happens before something actually runs out, not after |
+| `wardrobe_stats` | Shreya | Lifetime wear counts: the most-worn items and ones never worn once, tracked separately from the current wash cycle's wear count |
 
 Every `/chat` response returns `response`, `session_id` and `tool_calls` (name, args, result),
 and the page shows each tool call above the answer.

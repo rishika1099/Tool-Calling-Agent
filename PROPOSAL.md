@@ -26,6 +26,10 @@ Due **Wed Oct 7, 11:59pm**. Team: Rishika (rishika1099), Shreya (shreyashetty2),
 | Outfit builder: warmth, rain, wind, occasion formality, laundry | done |
 | Laundry: manual toggle in chat and closet panel | done |
 | Laundry: automatic wear limits per garment type | done |
+| Multi-person closet sharing (plan for a second person, no double-booking) | done |
+| Item quantity and partial laundry (own more than one of an item) | done |
+| Day tags and a multi-day, multi-person "Your layers" panel | done |
+| Proactive wardrobe reasoning: gap checks, laundry planning, wear stats | done |
 | Add clothes from photos + care labels (`scan_garment`, Gemini vision) | done; reviewed and tested by Shreya |
 | Onboarding: bedroom-window intro, Step 1 "Build your digital closet", demo closet option | done |
 | Style: color, shape, pattern, occasion rules | done |
@@ -52,6 +56,16 @@ Each person owns one **original tool** (the course requires one per team member)
 - Automatic laundry tracking: wear limits per garment type (`garments.csv`'s `wear_limit` column,
   `tools/catalog.wear_limit`). `update_wardrobe` sends an item to the laundry on its own once a
   `"worn"` update reaches that limit (a t-shirt after 1 wear, jeans after 5, a coat after 10).
+- Multi-person closet sharing: plan and build for a second person without double-booking a
+  physical item (`build_outfit`'s `for_whom`), scoped to skin-touching garments only (tops,
+  bottoms, dresses, legwear, socks) so a shared coat or pair of shoes stays available to both.
+- Owned quantity and partial laundry: own more than one of an item (e.g. 2 pairs of socks);
+  laundry tracks per-unit, not the whole item at once.
+- Day tags (`worn_for`) and a multi-day, multi-person "Your layers" panel: every day and person
+  planned in a conversation stays visible, not just the most recent.
+- Bonus: `suggest_wardrobe_gaps`, `plan_laundry`, `wardrobe_stats` (`tools/wardrobe_insights.py`) -
+  proactive closet reasoning rather than only reactive outfit-picking: missing weather coverage,
+  which categories are running low on clean units, and lifetime wear stats.
 - Sample garment and care-label photos in `data/demo_photos/` so graders can test scanning.
 
 ### Kshamaa: style + design

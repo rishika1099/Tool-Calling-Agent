@@ -37,7 +37,7 @@ class Session:
 
 def demo_wardrobe() -> dict[str, dict]:
     return {item["id"]: {"status": "clean", "wears": 0, "worn_by": None, "worn_for": None,
-                          "qty": 1, "qty_in_laundry": 0, **item}
+                          "qty": 1, "qty_in_laundry": 0, "lifetime_wears": 0, **item}
             for item in copy.deepcopy(DEMO_WARDROBE)}
 
 
