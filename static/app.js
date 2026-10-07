@@ -438,9 +438,13 @@ function closetCell(item, selectedIds) {
     if (item.worn_by) tags.push(`<span class="tag tag-person">${escapeHtml(item.worn_by)}</span>`);
     if (item.worn_for) tags.push(`<span class="tag tag-day">${escapeHtml(item.worn_for)}</span>`);
     const tagRow = tags.length ? `<div class="item-tags">${tags.join("")}</div>` : "";
-    const qtyBadge = qty > 1 ? `<span class="qty-note">${dirty ? `${qty - dirty} of ${qty} clean` : `own ${qty}`}</span>` : "";
-    btn.innerHTML = `${tagRow}${visual}<div>${escapeHtml(item.name)}</div>${qtyBadge}<span class="clo">${item.clo} clo</span>`;
-    btn.addEventListener("click", () => toggleLaundry(item, btn));
+    // Owning more than one: the count sits in a bubble on the corner, and a line under the name
+    // says how many are clean once some are in the laundry.
+    const qtyBubble = qty > 1 ? `<span class="qty-bubble" aria-label="You own ${qty}">${qty}</span>` : "";
+    const qtyBadge = qty > 1 && dirty ? `<span class="qty-note">${qty - dirty} of ${qty} clean</span>` : "";
+    btn.innerHTML = `${tagRow}${qtyBubble}${visual}<div>${escapeHtml(item.name)}</div>${qtyBadge}<span class="clo">${item.clo} clo</span>`;
+    btn.addEventListener("click", () => { if (!btn.dataset.swiped) toggleLaundry(item, btn); });
+    attachSwipe(btn, item);
     attachSpotlight(btn, 14);
     cell.appendChild(btn);
 
@@ -515,6 +519,58 @@ function renderCloset(selectedIds) {
 async function removeItem(item, cell) {
     if (A) await finish(safeAnimate(cell, { opacity: 0, scale: 0.8, duration: 300, ease: "inQuad" }), 500);
     await fetch(`/wardrobe/item?session_id=${encodeURIComponent(sessionId)}&item_id=${encodeURIComponent(item.id)}`, { method: "DELETE" });
+    await refresh();
+}
+
+// Swipe a closet card left to send it (or one of it) to the laundry, right to bring one back.
+// Tapping still works; a swipe just says which way you mean.
+const SWIPE_PX = 36;
+function attachSwipe(btn, item) {
+    let startX = 0, startY = 0, dx = 0, dragging = false;
+    const reset = () => { btn.style.translate = ""; btn.style.rotate = ""; btn.classList.remove("swiping"); };
+    btn.addEventListener("pointerdown", (e) => {
+        if (e.button) return;
+        startX = e.clientX; startY = e.clientY; dx = 0; dragging = true;
+        delete btn.dataset.swiped;
+    });
+    btn.addEventListener("pointermove", (e) => {
+        if (!dragging) return;
+        dx = e.clientX - startX;
+        if (Math.abs(dx) < 8 || Math.abs(e.clientY - startY) > Math.abs(dx)) return;  // a tap or a scroll
+        btn.setPointerCapture?.(e.pointerId);
+        btn.classList.add("swiping");
+        const pull = Math.max(-60, Math.min(60, dx));
+        btn.style.translate = `${pull}px 0`;
+        btn.style.rotate = `${pull / 12}deg`;
+        btn.dataset.swipe = dx < 0 ? "laundry" : "back";
+    });
+    const end = async () => {
+        if (!dragging) return;
+        dragging = false;
+        const swiped = btn.classList.contains("swiping") && Math.abs(dx) >= SWIPE_PX;
+        if (btn.classList.contains("swiping")) btn.dataset.swiped = "1";  // the click that follows is not a tap
+        reset();
+        if (!swiped) return;
+        const qty = item.qty ?? 1, dirty = item.qty_in_laundry ?? 0;
+        if (dx < 0) {
+            if (item.status === "in_laundry") return;  // nothing clean left to send
+            await setLaundry(item, "in_laundry");
+        } else if (qty > 1 && dirty > 0) {
+            await unlaundry(item);
+        } else if (item.status === "in_laundry") {
+            await setLaundry(item, "clean");
+        }
+    };
+    btn.addEventListener("pointerup", end);
+    btn.addEventListener("pointercancel", () => { dragging = false; reset(); });
+}
+
+async function setLaundry(item, status) {
+    await fetch("/wardrobe/status", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ session_id: sessionId, item_ids: [item.id], status }),
+    });
     await refresh();
 }
 

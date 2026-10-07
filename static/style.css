@@ -974,6 +974,25 @@ body.in-setup #composer { display: none; }
     border-radius: 50%; border: 0; background: var(--accent); color: var(--accent-ink);
     font-size: 13px; line-height: 20px; z-index: 2;
 }
+/* Swiping a card: it follows the finger, and a label says what letting go will do. */
+.closet .item { touch-action: pan-y; user-select: none; -webkit-user-select: none; }
+.closet .item img { -webkit-user-drag: none; pointer-events: none; }
+.item.swiping { transition: none; z-index: 3; }
+.item.swiping::before {
+    content: "Laundry"; position: absolute; inset: auto 0 0 0; width: auto; height: auto; padding: 4px 0;
+    opacity: 1; border-radius: 0; transform: none; pointer-events: none;
+    font: 600 9px/1 var(--mono); letter-spacing: 0.06em; text-transform: uppercase;
+    background: var(--accent); color: var(--accent-ink); z-index: 2;
+}
+.item.swiping[data-swipe="back"]::before { content: "Back to closet"; background: #4c9a6a; color: #fff; }
+.qty-bubble {
+    position: absolute; top: 5px; right: 5px; min-width: 20px; height: 20px; padding: 0 5px;
+    border-radius: 999px; background: var(--accent); color: var(--accent-ink);
+    font: 600 11px/20px var(--mono); text-align: center; z-index: 1;
+    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.25);
+}
+.item-cell:has(.rm) .qty-bubble { right: 32px; }  /* leave the corner for the remove button */
+.item.in_laundry .qty-bubble { display: none; }   /* the laundry ribbon takes that corner */
 .qty-note { display: block; font: 500 9px/1.2 var(--mono); color: var(--soft); margin-top: 2px; }
 
 .fc-collage { position: absolute; inset: 0; display: grid; gap: 2px; background: var(--line); }
