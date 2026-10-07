@@ -28,12 +28,12 @@ Due **Wed Oct 7, 11:59pm**. Team: Rishika (rishika1099), Shreya (shreyashetty2),
 | Laundry: automatic wear limits per garment type | done |
 | Add clothes from photos + care labels (`scan_garment`, Gemini vision) | done; reviewed and tested by Shreya |
 | Onboarding: bedroom-window intro, Step 1 "Build your digital closet", demo closet option | done |
-| Style: color, shape, pattern, occasion rules | to do (Kshamaa) |
+| Style: color, shape, pattern, occasion rules | done |
 | Motion with anime.js: timeline, outfit, closet, chat | first pass done |
-| Frontend polish, mobile, dark mode, effects inspired by reactbits / originkit | to do (Kshamaa) |
+| Frontend polish, mobile, dark mode, effects inspired by reactbits / originkit | done |
 | Offline tests (`uv run pytest`) and tool-selection evals | done (run evals once credentials are set up) |
 | Architecture diagram in the README | done |
-| Deploy to Cloud Run | to do (Rishika) |
+| Deploy to Cloud Run | done |
 | Comfort feedback ("I was freezing") adjusts future plans | done |
 | Try-on image (Gemini image model on Vertex AI), with a sample person for testing | done |
 | Launch video with /brag | last day (Kshamaa) |
