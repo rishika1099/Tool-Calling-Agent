@@ -444,15 +444,6 @@ function closetCell(item, selectedIds) {
     attachSpotlight(btn, 14);
     cell.appendChild(btn);
 
-    const stepper = document.createElement("div");
-    stepper.className = "qty-stepper";
-    stepper.innerHTML = `<button type="button" class="qty-dec" aria-label="Own fewer ${escapeHtml(item.name)}">−</button>
-        <span class="qty-val">${qty}</span>
-        <button type="button" class="qty-inc" aria-label="Own more ${escapeHtml(item.name)}">+</button>`;
-    stepper.querySelector(".qty-dec").addEventListener("click", (e) => { e.stopPropagation(); setQty(item, Math.max(1, qty - 1)); });
-    stepper.querySelector(".qty-inc").addEventListener("click", (e) => { e.stopPropagation(); setQty(item, qty + 1); });
-    cell.appendChild(stepper);
-
     if (qty > 1 && dirty > 0) {
         const undo = document.createElement("button");
         undo.type = "button";
@@ -535,15 +526,6 @@ async function toggleLaundry(item, btn) {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ session_id: sessionId, item_ids: [item.id], status }),
-    });
-    await refresh();
-}
-
-async function setQty(item, qty) {
-    await fetch("/wardrobe/qty", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ session_id: sessionId, item_id: item.id, qty }),
     });
     await refresh();
 }
