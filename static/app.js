@@ -773,48 +773,74 @@ function addUserMessage(text, photos) {
 }
 
 function addAssistantMessage(response, toolCalls) {
+    // Each piece (the tool-calls box, the response text, any try-on figure) is built in its own
+    // try/catch and appended independently: a complex multi-day/multi-person turn has more tool
+    // results for any one piece to choke on, and previously the whole div (including the tool-calls
+    // box, built first) was only ever appended once, at the very end — so one bad piece silently
+    // dropped the entire message, tool-calls box included, replacing it with the generic "something
+    // went wrong" from sendMessage's outer catch. Now a failure in one piece can't take the rest down.
     const div = document.createElement("div");
     div.className = "msg assistant";
     if (toolCalls.length) {
-        const tools = document.createElement("div");
-        tools.className = "tools";
-        for (const call of toolCalls) {
-            const details = document.createElement("details");
-            let pretty = call.result;
-            try { pretty = JSON.stringify(JSON.parse(call.result), null, 2); } catch (e) { /* not JSON */ }
-            details.innerHTML = `<summary><b>${escapeHtml(call.name)}</b></summary>
-                <pre>${escapeHtml(`args: ${JSON.stringify(call.args, null, 2)}\n\nresult: ${pretty}`)}</pre>`;
-            tools.appendChild(details);
+        try {
+            const tools = document.createElement("div");
+            tools.className = "tools";
+            for (const call of toolCalls) {
+                const details = document.createElement("details");
+                let pretty = call.result;
+                try { pretty = JSON.stringify(JSON.parse(call.result), null, 2); } catch (e) { /* not JSON */ }
+                details.innerHTML = `<summary><b>${escapeHtml(call.name)}</b></summary>
+                    <pre>${escapeHtml(`args: ${JSON.stringify(call.args, null, 2)}\n\nresult: ${pretty}`)}</pre>`;
+                tools.appendChild(details);
+            }
+            div.appendChild(tools);
+        } catch (e) {
+            console.warn("Layer Lab: skipped rendering the tool-calls box:", e.message);
         }
-        div.appendChild(tools);
     }
-    const content = document.createElement("div");
-    content.className = "content";
-    content.innerHTML = renderMarkdown(response);
+    let content;
+    try {
+        content = document.createElement("div");
+        content.className = "content";
+        content.innerHTML = renderMarkdown(response);
+    } catch (e) {
+        console.warn("Layer Lab: markdown rendering failed, showing plain text:", e.message);
+        content = document.createElement("div");
+        content.className = "content";
+        content.textContent = response;
+    }
     div.appendChild(content);
     // A try-on preview, if the agent made one.
     for (const call of toolCalls) {
         if (call.name !== "try_on_outfit") continue;
-        let result = {};
-        try { result = JSON.parse(call.result); } catch (e) { /* not JSON */ }
-        if (!result.image_url) continue;
-        const fig = document.createElement("figure");
-        fig.className = "tryon";
-        fig.innerHTML = `<img src="${escapeHtml(result.image_url)}" alt="AI preview of you wearing ${escapeHtml((result.items || []).join(", "))}">
-            <figcaption>AI preview · colors and fit are approximate</figcaption>`;
-        fig.querySelector("img").addEventListener("load", () => messagesEl.scrollTo({ top: messagesEl.scrollHeight, behavior: "smooth" }));
-        div.appendChild(fig);
-        showPreview(result.image_url);
+        try {
+            let result = {};
+            try { result = JSON.parse(call.result); } catch (e) { /* not JSON */ }
+            if (!result.image_url) continue;
+            const fig = document.createElement("figure");
+            fig.className = "tryon";
+            fig.innerHTML = `<img src="${escapeHtml(result.image_url)}" alt="AI preview of you wearing ${escapeHtml((result.items || []).join(", "))}">
+                <figcaption>AI preview · colors and fit are approximate</figcaption>`;
+            fig.querySelector("img").addEventListener("load", () => messagesEl.scrollTo({ top: messagesEl.scrollHeight, behavior: "smooth" }));
+            div.appendChild(fig);
+            showPreview(result.image_url);
+        } catch (e) {
+            console.warn("Layer Lab: skipped a try-on preview:", e.message);
+        }
     }
     messagesEl.appendChild(div);
 
     if (A) {
-        safeAnimate(div.querySelectorAll(".tools details"), { opacity: { from: 0 }, scale: { from: 0.7 }, duration: 500,
-            delay: A.stagger(70), ease: "outBack(1.8)" });
-        const words = [...splitWords(content)];
-        const start = toolCalls.length * 70 + 150;
-        safeAnimate(words, { opacity: { from: 0 }, filter: { from: "blur(8px)", to: "blur(0px)" }, translateY: { from: 6 },
-            duration: 600, delay: A.stagger(Math.max(6, Math.min(18, 900 / words.length)), { start }), ease: "outQuad" });
+        try {
+            safeAnimate(div.querySelectorAll(".tools details"), { opacity: { from: 0 }, scale: { from: 0.7 }, duration: 500,
+                delay: A.stagger(70), ease: "outBack(1.8)" });
+            const words = [...splitWords(content)];
+            const start = toolCalls.length * 70 + 150;
+            safeAnimate(words, { opacity: { from: 0 }, filter: { from: "blur(8px)", to: "blur(0px)" }, translateY: { from: 6 },
+                duration: 600, delay: A.stagger(Math.max(6, Math.min(18, 900 / words.length)), { start }), ease: "outQuad" });
+        } catch (e) {
+            console.warn("Layer Lab: skipped the message entrance animation:", e.message);
+        }
     }
 }
 
