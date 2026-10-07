@@ -319,6 +319,53 @@ def test_build_outfit_avoids_overlap_on_an_earlier_day_even_after_a_later_day_is
     assert "jeans-indigo" not in {i["id"] for i in sister_day1["options"][0]["items"]}
 
 
+def test_build_outfit_avoids_repeating_the_same_persons_top_and_bottom_two_days_running():
+    # Reported: the same person got offered the exact same top+bottom two days in a row even
+    # though nothing requires reusing them (no scarcity, no hygiene issue with your own clothes) -
+    # purely a variety preference, distinct from the cross-person/same-day physical-conflict check.
+    _, session = get_session(None)
+    session.last_plan = {**SHARED_PLAN, "date": "2026-10-07"}
+    day1 = json.loads(run_tool("build_outfit", {"for_whom": "me"}, session))
+    day1_core = {i["id"] for i in day1["options"][0]["items"] if i["slot"] in ("base_top", "bottom", "one_piece")}
+
+    session.last_plan = {**SHARED_PLAN, "date": "2026-10-08"}
+    day2 = json.loads(run_tool("build_outfit", {"for_whom": "me"}, session))
+    day2_core = {i["id"] for i in day2["options"][0]["items"] if i["slot"] in ("base_top", "bottom", "one_piece")}
+    assert not (day1_core & day2_core)
+
+
+def test_build_outfit_variety_check_applies_even_without_for_whom():
+    # "me or anyone": the variety guard should work for a plain single-user conversation too, not
+    # just when for_whom is explicitly passed for a shared closet.
+    _, session = get_session(None)
+    session.last_plan = {**SHARED_PLAN, "date": "2026-10-07"}
+    day1 = json.loads(run_tool("build_outfit", {}, session))
+    day1_core = {i["id"] for i in day1["options"][0]["items"] if i["slot"] in ("base_top", "bottom", "one_piece")}
+
+    session.last_plan = {**SHARED_PLAN, "date": "2026-10-08"}
+    day2 = json.loads(run_tool("build_outfit", {}, session))
+    day2_core = {i["id"] for i in day2["options"][0]["items"] if i["slot"] in ("base_top", "bottom", "one_piece")}
+    assert not (day1_core & day2_core)
+
+
+def test_build_outfit_variety_check_backs_off_when_nothing_else_is_available():
+    # Repeating is sometimes unavoidable without an actual laundry cycle - the soft variety
+    # preference shouldn't block a valid answer outright when the closet is this scarce.
+    _, session = get_session(None)
+    for item in session.wardrobe.values():
+        if slot(item) in ("base_top", "bottom", "one_piece") and item["id"] not in ("tee-white", "jeans-indigo"):
+            item["status"] = "in_laundry"
+
+    session.last_plan = {**SHARED_PLAN, "date": "2026-10-07"}
+    day1 = json.loads(run_tool("build_outfit", {"for_whom": "me"}, session))
+    assert {"tee-white", "jeans-indigo"} <= {i["id"] for i in day1["options"][0]["items"]}
+
+    session.last_plan = {**SHARED_PLAN, "date": "2026-10-08"}
+    day2 = json.loads(run_tool("build_outfit", {"for_whom": "me"}, session))
+    assert "error" not in day2
+    assert {"tee-white", "jeans-indigo"} <= {i["id"] for i in day2["options"][0]["items"]}
+
+
 def test_build_outfit_allows_sharing_an_item_owned_in_multiples():
     # Owning 2 of something (set from the closet panel) means two people can legitimately both
     # get offered it - the soft avoid-duplicate check should only kick in once every owned unit

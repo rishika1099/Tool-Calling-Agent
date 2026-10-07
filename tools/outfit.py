@@ -157,8 +157,14 @@ def build_outfit(session, occasion: str = "class", must_include: list[str] | Non
     for_whom's build for that same day runs. This only kicks in once every owned unit of that item
     is already claimed this way: owning 2 of something (set from the closet panel) means two
     people can legitimately both get offered it. This is a soft preference, not a hard rule, and
-    backs off automatically if honoring it would leave no outfit at all. Omit for a single user;
-    nothing changes for that case.
+    backs off automatically if honoring it would leave no outfit at all.
+
+    Separately, and regardless of for_whom (this applies to a single user too): a build for the
+    same person on a *different* day steers away from that same person's own top, bottom or dress
+    from their other days this session, so the same combo doesn't get suggested two days running
+    just for variety's sake - this one is about repetition, not availability or hygiene, so it
+    doesn't touch outerwear, mid-layers, shoes or accessories (re-wearing your own coat or shoes
+    day to day is completely normal). Also a soft preference with the same automatic backoff.
     """
     plan = session.last_plan
     if not plan:
@@ -181,6 +187,11 @@ def build_outfit(session, occasion: str = "class", must_include: list[str] | Non
     summary = plan["summary"]
     day = plan.get("date")
 
+    # who_key tracks recent_picks even when for_whom is omitted (defaulting to "me", matching
+    # build_outfit's own result below): a plain single-user conversation should still get the
+    # same-day variety guard, not just the explicitly-shared-closet case.
+    who_key = for_whom or "me"
+
     # Only soft-avoid an item once every owned unit is already claimed by someone else's recent
     # pick *for this same day*: owning 2 pairs of the same boots means two people genuinely can
     # get offered "the same boots" without it being a physical conflict, so count claims against
@@ -191,13 +202,24 @@ def build_outfit(session, occasion: str = "class", must_include: list[str] | Non
     # bottom for the same day, as long as the model built several of one person's days first).
     elsewhere_claims = Counter(
         iid for (who, picked_day), ids in session.recent_picks.items()
-        if for_whom and who.strip().lower() != for_whom.strip().lower() and picked_day == day
+        if who.strip().lower() != who_key.strip().lower() and picked_day == day
         for iid in ids)
     recent_elsewhere = [iid for iid, claims in elsewhere_claims.items()
                          if claims >= session.wardrobe.get(iid, {}).get("qty", 1)]
 
-    def _score(soft_avoid: list[str]):
-        avoid = set(exclude) | set(soft_avoid)
+    # Same person, a different day: avoid repeating your own exact top/bottom/dress two days
+    # running. This is a variety preference, not a hygiene or physical-availability one - your own
+    # shoes, socks, outer or mid-layer repeating day to day is completely normal and not touched.
+    own_other_days = {
+        iid for (who, picked_day), ids in session.recent_picks.items()
+        if who.strip().lower() == who_key.strip().lower() and picked_day != day
+        for iid in ids
+        if iid in session.wardrobe and slot(session.wardrobe[iid]) in ("base_top", "bottom", "one_piece")
+    }
+    soft_avoid = list(set(recent_elsewhere) | own_other_days)
+
+    def _score(avoid_these: list[str]):
+        avoid = set(exclude) | set(avoid_these)
         available = [i for i in session.wardrobe.values()
                      if i["status"] != "in_laundry" and i["id"] not in avoid and not _claimed_by_someone_else(i)]
         wearable = [i for i in available if slot(i) not in ("head", "hands", "neck")]
@@ -209,10 +231,10 @@ def build_outfit(session, occasion: str = "class", must_include: list[str] | Non
                 scored.append((_evaluate(outfit, summary, occasion), outfit))
         return scored, accessories
 
-    scored, accessories = _score(recent_elsewhere)
-    if not scored and recent_elsewhere:
-        # Honoring the soft same-session overlap avoidance left nothing: a small closet shouldn't
-        # hard-fail over a preference, so retry without it.
+    scored, accessories = _score(soft_avoid)
+    if not scored and soft_avoid:
+        # Honoring the soft same-session overlap/variety avoidance left nothing: a small closet
+        # shouldn't hard-fail over a preference, so retry without it.
         scored, accessories = _score([])
     if not scored:
         return json.dumps({"error": "No complete outfit is available. The closet needs at least a top and a bottom "
@@ -240,8 +262,7 @@ def build_outfit(session, occasion: str = "class", must_include: list[str] | Non
             break
 
     session.last_outfit = [i["id"] for i in options[0]["items"]]
-    if for_whom:
-        session.recent_picks[(for_whom, day)] = [i["id"] for i in options[0]["items"]]
+    session.recent_picks[(who_key, day)] = [i["id"] for i in options[0]["items"]]
     return json.dumps({
         "date": plan.get("date"),
         "for_whom": for_whom or "me",
@@ -369,7 +390,8 @@ TOOLS = [
                 "legwear or sock someone else already has on is left out, and this call also automatically "
                 "steers away from every item (any slot, including coats and shoes - a single pair of boots "
                 "can't be on two people on the same day) a different for_whom was picked for this exact "
-                "same day, even before anything is confirmed with update_wardrobe."
+                "same day, even before anything is confirmed with update_wardrobe. Also automatically avoids "
+                "repeating the same person's own top/bottom/dress on a different day, for variety."
             ),
             "parameters": {
                 "type": "object",
