@@ -8,9 +8,9 @@ the model never sees or fills that argument.
 import inspect
 import json
 
-from . import alerts, forecast, outfit, style, tryon, warmth, wardrobe
+from . import alerts, forecast, outfit, style, tryon, warmth, wardrobe, wardrobe_insights
 
-_MODULES = [forecast, alerts, warmth, outfit, wardrobe, style, tryon]
+_MODULES = [forecast, alerts, warmth, outfit, wardrobe, style, tryon, wardrobe_insights]
 
 TOOLS = [tool for module in _MODULES for tool in module.TOOLS]
 TOOL_MAP = {name: fn for module in _MODULES for name, fn in module.TOOL_MAP.items()}

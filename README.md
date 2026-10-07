@@ -15,6 +15,14 @@ to class at 9, sit in class until 1, wait for the bus"), and Layer Lab:
 **See it on you:** add a full-body photo under "Your layers" (or use the built-in sample photo of a
 fictional, AI-generated person), ask for an outfit, then click "See it on me".
 
+**Share your closet:** ask for an outfit "for me and my roommate" to plan for a second person who
+shares the same physical clothes — Layer Lab won't double-book a top, pair of pants or dress
+someone else already has on (coats and shoes stay shareable), and automatically avoids suggesting
+the exact same thing to both of you. Own more than one of an item (e.g. 2 pairs of socks)? The
+closet tracks partial laundry per unit, not the whole item at once. Plan more than one day in a
+conversation and "Your layers" stacks every day (and person) side by side, each tagged with who
+it's for and which day.
+
 **How to use it:** the intro shows today's real sky through a bedroom window. "Build my closet" takes
 you to Step 1: drop in photos of your clothes (and their care labels); each photo is scanned by Gemini
 vision, you check the details, and the checklist shows when you have a shirt, bottoms, a coat and shoes
@@ -50,6 +58,9 @@ Each piece has an AI-generated product-style photo (an illustration of the demo 
 | `scan_garment` | Shreya | Adds clothes from a photo with Gemini vision, reading the care label for the exact fiber mix; every field is validated against fixed lists. Sample photos: `data/demo_photos/` |
 | `style_check` | Kshamaa | Scores whether an outfit goes together: color, shape, pattern, occasion |
 | `try_on_outfit` | Rishika | Shows the user wearing the outfit: one generated image from their photo, their garment photos and the outfit list (Gemini image model on Vertex AI) |
+| `suggest_wardrobe_gaps` | Shreya | Flags closet coverage gaps against the current plan: a missing waterproof or windproof coat, no shoes at all, or not enough warmth available even stacking every layer. Reasons about what's missing, not just what to pick |
+| `plan_laundry` | Shreya | How many clean units are left in each clothing category and which are running low, so laundry happens before something actually runs out, not after |
+| `wardrobe_stats` | Shreya | Lifetime wear counts: the most-worn items and ones never worn once, tracked separately from the current wash cycle's wear count |
 
 Every `/chat` response returns `response`, `session_id` and `tool_calls` (name, args, result),
 and the page shows each tool call above the answer.
@@ -92,7 +103,7 @@ The animated sky ports the WebGL shader from [Originkit](https://www.originkit.d
 The full plan, mapped to the grading rubric with the latest live results, is in [TESTING.md](TESTING.md).
 
 - `uv run pytest`: offline checks of the warmth model (including the ISO 7730 PMV reference values) and the outfit builder.
-- `uv run python evals/tool_calls.py`: 11 real prompts through the agent, checking it calls the right tools in the right order (needs Gemini credentials).
+- `uv run python evals/tool_calls.py`: 14 real prompts through the agent, checking it calls the right tools in the right order (needs Gemini credentials).
 
 ## Security
 

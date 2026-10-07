@@ -159,7 +159,9 @@ TOOLS = [
                 "picked; for 'option 2' pass that option's item ids from the build_outfit result. If more than one "
                 "day and/or person has been planned in this conversation, match item_ids to the specific "
                 "build_outfit call the request names (e.g. 'option 2 for tomorrow', 'Alex's outfit'), not just the "
-                "most recent one."
+                "most recent one. Only one photo is saved per session (the primary user's); if the outfit shown "
+                "belongs to someone else and no new photo was attached for them in this message, this still "
+                "renders the primary user's own photo wearing it, not that other person's."
             ),
             "parameters": {
                 "type": "object",

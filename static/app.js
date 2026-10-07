@@ -55,21 +55,60 @@ function escapeHtml(text) {
 }
 
 // Just enough markdown for the model's answers: paragraphs, bullet lists, **bold**.
+// Headings (#..######), horizontal rules (---), and up to one level of nested bullets (2+ spaces
+// of indent), on top of the original flat-bullet/paragraph/bold support. A multi-day or
+// multi-person answer naturally wants "Person: intro" as a top-level bullet with that person's
+// own details indented under it, and the model's own section headers (e.g. "### Today") need
+// somewhere to go other than literal "###" text in the middle of a chat bubble.
 function renderMarkdown(text) {
+    const inline = (s) => escapeHtml(s).replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>");
     const html = [];
-    let list = null;
+    let topItems = null; // open top-level <li> strings for the current list
+    let subItems = null; // open nested <li> strings for the current top-level item
+
+    const closeSub = () => {
+        if (subItems && topItems && topItems.length) {
+            const nested = `<ul>${subItems.join("")}</ul>`;
+            topItems[topItems.length - 1] = topItems[topItems.length - 1].replace(/<\/li>$/, `${nested}</li>`);
+        }
+        subItems = null;
+    };
+    const closeTop = () => {
+        closeSub();
+        if (topItems) { html.push(`<ul>${topItems.join("")}</ul>`); topItems = null; }
+    };
+
     for (const raw of (text || "").split("\n")) {
-        const line = escapeHtml(raw.trim()).replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>");
-        const bullet = line.match(/^[-*•]\s+(.*)/);
-        if (bullet) {
-            list = list || [];
-            list.push(`<li>${bullet[1]}</li>`);
+        const indent = (raw.match(/^[ \t]*/)[0] || "").replace(/\t/g, "  ").length;
+        const trimmed = raw.trim();
+        const heading = trimmed.match(/^(#{1,6})\s+(.*)/);
+        const bullet = trimmed.match(/^[-*•]\s+(.*)/);
+        const hr = /^(-{3,}|\*{3,}|_{3,})$/.test(trimmed);
+
+        if (heading) {
+            closeTop();
+            // One consistent heading style regardless of #-depth: a chat bubble is too small for
+            // six distinct visual tiers, and the model only ever uses headings as simple section
+            // breaks (e.g. "### Today").
+            html.push(`<h4>${inline(heading[2])}</h4>`);
             continue;
         }
-        if (list) { html.push(`<ul>${list.join("")}</ul>`); list = null; }
-        if (line) html.push(`<p>${line}</p>`);
+        if (hr) { closeTop(); html.push("<hr>"); continue; }
+        if (bullet) {
+            if (indent >= 2 && topItems && topItems.length) {
+                subItems = subItems || [];
+                subItems.push(`<li>${inline(bullet[1])}</li>`);
+            } else {
+                closeSub();
+                topItems = topItems || [];
+                topItems.push(`<li>${inline(bullet[1])}</li>`);
+            }
+            continue;
+        }
+        closeTop();
+        if (trimmed) html.push(`<p>${inline(trimmed)}</p>`);
     }
-    if (list) html.push(`<ul>${list.join("")}</ul>`);
+    closeTop();
     return html.join("");
 }
 
@@ -773,48 +812,74 @@ function addUserMessage(text, photos) {
 }
 
 function addAssistantMessage(response, toolCalls) {
+    // Each piece (the tool-calls box, the response text, any try-on figure) is built in its own
+    // try/catch and appended independently: a complex multi-day/multi-person turn has more tool
+    // results for any one piece to choke on, and previously the whole div (including the tool-calls
+    // box, built first) was only ever appended once, at the very end — so one bad piece silently
+    // dropped the entire message, tool-calls box included, replacing it with the generic "something
+    // went wrong" from sendMessage's outer catch. Now a failure in one piece can't take the rest down.
     const div = document.createElement("div");
     div.className = "msg assistant";
     if (toolCalls.length) {
-        const tools = document.createElement("div");
-        tools.className = "tools";
-        for (const call of toolCalls) {
-            const details = document.createElement("details");
-            let pretty = call.result;
-            try { pretty = JSON.stringify(JSON.parse(call.result), null, 2); } catch (e) { /* not JSON */ }
-            details.innerHTML = `<summary><b>${escapeHtml(call.name)}</b></summary>
-                <pre>${escapeHtml(`args: ${JSON.stringify(call.args, null, 2)}\n\nresult: ${pretty}`)}</pre>`;
-            tools.appendChild(details);
+        try {
+            const tools = document.createElement("div");
+            tools.className = "tools";
+            for (const call of toolCalls) {
+                const details = document.createElement("details");
+                let pretty = call.result;
+                try { pretty = JSON.stringify(JSON.parse(call.result), null, 2); } catch (e) { /* not JSON */ }
+                details.innerHTML = `<summary><b>${escapeHtml(call.name)}</b></summary>
+                    <pre>${escapeHtml(`args: ${JSON.stringify(call.args, null, 2)}\n\nresult: ${pretty}`)}</pre>`;
+                tools.appendChild(details);
+            }
+            div.appendChild(tools);
+        } catch (e) {
+            console.warn("Layer Lab: skipped rendering the tool-calls box:", e.message);
         }
-        div.appendChild(tools);
     }
-    const content = document.createElement("div");
-    content.className = "content";
-    content.innerHTML = renderMarkdown(response);
+    let content;
+    try {
+        content = document.createElement("div");
+        content.className = "content";
+        content.innerHTML = renderMarkdown(response);
+    } catch (e) {
+        console.warn("Layer Lab: markdown rendering failed, showing plain text:", e.message);
+        content = document.createElement("div");
+        content.className = "content";
+        content.textContent = response;
+    }
     div.appendChild(content);
     // A try-on preview, if the agent made one.
     for (const call of toolCalls) {
         if (call.name !== "try_on_outfit") continue;
-        let result = {};
-        try { result = JSON.parse(call.result); } catch (e) { /* not JSON */ }
-        if (!result.image_url) continue;
-        const fig = document.createElement("figure");
-        fig.className = "tryon";
-        fig.innerHTML = `<img src="${escapeHtml(result.image_url)}" alt="AI preview of you wearing ${escapeHtml((result.items || []).join(", "))}">
-            <figcaption>AI preview · colors and fit are approximate</figcaption>`;
-        fig.querySelector("img").addEventListener("load", () => messagesEl.scrollTo({ top: messagesEl.scrollHeight, behavior: "smooth" }));
-        div.appendChild(fig);
-        showPreview(result.image_url);
+        try {
+            let result = {};
+            try { result = JSON.parse(call.result); } catch (e) { /* not JSON */ }
+            if (!result.image_url) continue;
+            const fig = document.createElement("figure");
+            fig.className = "tryon";
+            fig.innerHTML = `<img src="${escapeHtml(result.image_url)}" alt="AI preview of you wearing ${escapeHtml((result.items || []).join(", "))}">
+                <figcaption>AI preview · colors and fit are approximate</figcaption>`;
+            fig.querySelector("img").addEventListener("load", () => messagesEl.scrollTo({ top: messagesEl.scrollHeight, behavior: "smooth" }));
+            div.appendChild(fig);
+            showPreview(result.image_url);
+        } catch (e) {
+            console.warn("Layer Lab: skipped a try-on preview:", e.message);
+        }
     }
     messagesEl.appendChild(div);
 
     if (A) {
-        safeAnimate(div.querySelectorAll(".tools details"), { opacity: { from: 0 }, scale: { from: 0.7 }, duration: 500,
-            delay: A.stagger(70), ease: "outBack(1.8)" });
-        const words = [...splitWords(content)];
-        const start = toolCalls.length * 70 + 150;
-        safeAnimate(words, { opacity: { from: 0 }, filter: { from: "blur(8px)", to: "blur(0px)" }, translateY: { from: 6 },
-            duration: 600, delay: A.stagger(Math.max(6, Math.min(18, 900 / words.length)), { start }), ease: "outQuad" });
+        try {
+            safeAnimate(div.querySelectorAll(".tools details"), { opacity: { from: 0 }, scale: { from: 0.7 }, duration: 500,
+                delay: A.stagger(70), ease: "outBack(1.8)" });
+            const words = [...splitWords(content)];
+            const start = toolCalls.length * 70 + 150;
+            safeAnimate(words, { opacity: { from: 0 }, filter: { from: "blur(8px)", to: "blur(0px)" }, translateY: { from: 6 },
+                duration: 600, delay: A.stagger(Math.max(6, Math.min(18, 900 / words.length)), { start }), ease: "outQuad" });
+        } catch (e) {
+            console.warn("Layer Lab: skipped the message entrance animation:", e.message);
+        }
     }
 }
 
@@ -861,20 +926,20 @@ async function sendMessage(text) {
         const data = await res.json();
         sessionId = data.session_id;
         // A single answer can plan more than one day, and more than one person, in one go (e.g.
-        // "today and tomorrow", or "for me and my roommate"). Pair each build_outfit with the
-        // plan_day_warmth that fed it (for its day) and its own for_whom (for its person), and
-        // keep every day/person combination seen this conversation, not just the latest.
-        let planDate = null;
+        // "today and tomorrow", or "for me and my roommate"). Each build_outfit result carries its
+        // own date and for_whom directly (tools/outfit.py), so every entry is keyed from data the
+        // call itself returned — not from tracking the most recent plan_day_warmth call seen so
+        // far, which broke if the model ever planned more than one day before building either
+        // outfit (every build_outfit would wrongly pair with whichever plan was last, mislabeling
+        // earlier days and colliding on the same Map key). Keep every day/person combination seen
+        // this conversation, not just the latest.
         for (const call of data.tool_calls) {
-            if (call.name === "plan_day_warmth") {
-                try { planDate = JSON.parse(call.result).date || planDate; } catch (e) { /* ignore */ }
-            }
             if (call.name !== "build_outfit") continue;
             try {
                 const parsed = JSON.parse(call.result);
                 if (!parsed.options) continue;
-                const forWhom = call.args?.for_whom || "me";
-                const day = planDate || "today";
+                const forWhom = parsed.for_whom || call.args?.for_whom || "me";
+                const day = parsed.date || "today";
                 const key = `${forWhom}||${day}`;
                 outfitEntries.set(key, { key, forWhom, day, outfit: parsed, optionIndex: 0, shown: false });
                 focusedEntryKey = key;
@@ -1140,8 +1205,20 @@ function showPreview(url) {
     if (A) safeAnimate(el, { opacity: { from: 0 }, scale: { from: 0.94 }, duration: 800, ease: "outExpo" });
 }
 
+// "See it on me" always means the primary user's own saved photo, so it should default to the
+// primary user's own earliest-day outfit - not focusedEntryKey, which tracks whichever carousel
+// card was clicked or build_outfit call landed last (could be a different day or a different
+// person entirely in a multi-day/multi-person turn, which looked like random picking).
+function meTryEntry() {
+    const entries = [...outfitEntries.values()];
+    if (!entries.length) return null;
+    const mine = entries.filter((e) => (e.forWhom || "me").toLowerCase() === "me");
+    const pool = mine.length ? mine : entries;
+    return pool.slice().sort((a, b) => a.day.localeCompare(b.day))[0];
+}
+
 $("#me-try").addEventListener("click", () => {
-    const entry = outfitEntries.get(focusedEntryKey) || [...outfitEntries.values()][0];
+    const entry = meTryEntry();
     if (!entry) return;
     const n = entry.optionIndex + 1;
     const base = entry.outfit.options.length > 1 ? `Show me wearing option ${n}` : "Show me wearing this outfit";

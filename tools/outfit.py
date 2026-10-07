@@ -20,6 +20,8 @@ TIGHTS = {"tights", "fleece_tights"}
 ACCESSORY_ORDER = ["gloves", "beanie", "scarf"]
 LAYER_COST = 0.08  # small cost per optional layer, so we never add layers that don't help
 STATUSES = ["clean", "worn", "in_laundry"]
+# Worn against skin: not shared between people in a closet until laundered, unlike outer/shoes/accessories.
+HYGIENE_SLOTS = {"base_top", "bottom", "one_piece", "legwear", "socks"}
 
 
 def _by_slot(items: list[dict]) -> dict[str, list[dict]]:
@@ -137,10 +139,18 @@ def build_outfit(session, occasion: str = "class", must_include: list[str] | Non
     """Rank outfits from the closet against the most recent plan_day_warmth result.
 
     for_whom names who this outfit is for (e.g. "me" or a friend's name), only needed when more
-    than one person shares this closet in the same session. When given, any item someone else is
+    than one person shares this closet in the same session. When given, an item someone else is
     currently wearing (update_wardrobe's worn_by, status "worn") is left out too, on top of the
-    laundry and exclude filters, since a shared physical item can't be worn by two people at once.
-    Omit for a single user; nothing changes for that case.
+    laundry and exclude filters, since a shared physical item can't be worn by two people at once
+    (and, once laundered, each needs their own wash, not a pass straight to someone else).
+    This only applies to garments worn directly against skin (tops, bottoms, dresses, legwear,
+    socks) for hygiene; outerwear, mid-layers, shoes and accessories stay available to everyone
+    regardless of who currently has them on. for_whom also steers this pick away from whatever
+    top/bottom/dress/legwear/socks was most recently picked for a *different* for_whom this
+    session, so two people asked about in the same answer don't both get offered the identical
+    physical garment before either has actually claimed anything with update_wardrobe; this is a
+    soft preference, not a hard rule, and backs off automatically if honoring it would leave no
+    outfit at all. Omit for a single user; nothing changes for that case.
     """
     plan = session.last_plan
     if not plan:
@@ -153,24 +163,36 @@ def build_outfit(session, occasion: str = "class", must_include: list[str] | Non
         return json.dumps({"error": f"Unknown item ids {unknown}. Call list_wardrobe to see valid ids."})
 
     def _claimed_by_someone_else(item: dict) -> bool:
-        if not for_whom or not item.get("worn_by"):
+        if not for_whom or not item.get("worn_by") or slot(item) not in HYGIENE_SLOTS:
             return False
         return str(item["worn_by"]).strip().lower() != str(for_whom).strip().lower()
 
-    available = [i for i in session.wardrobe.values()
-                 if i["status"] != "in_laundry" and i["id"] not in exclude and not _claimed_by_someone_else(i)]
     laundry = [i["name"] for i in session.wardrobe.values() if i["status"] == "in_laundry"]
     claimed = [i["name"] for i in session.wardrobe.values()
                if i["status"] != "in_laundry" and _claimed_by_someone_else(i)]
-    wearable = [i for i in available if slot(i) not in ("head", "hands", "neck")]
-    accessories = [i for i in available if slot(i) in ("head", "hands", "neck")]
-
     summary = plan["summary"]
-    scored = []
-    for outfit in _combos(wearable):
-        ids = {i["id"] for i in outfit}
-        if all(m in ids for m in must_include if slot(session.wardrobe[m]) not in ("head", "hands", "neck")):
-            scored.append((_evaluate(outfit, summary, occasion), outfit))
+
+    recent_elsewhere = [iid for who, ids in session.recent_picks.items()
+                         if for_whom and who.strip().lower() != for_whom.strip().lower() for iid in ids]
+
+    def _score(soft_avoid: list[str]):
+        avoid = set(exclude) | set(soft_avoid)
+        available = [i for i in session.wardrobe.values()
+                     if i["status"] != "in_laundry" and i["id"] not in avoid and not _claimed_by_someone_else(i)]
+        wearable = [i for i in available if slot(i) not in ("head", "hands", "neck")]
+        accessories = [i for i in available if slot(i) in ("head", "hands", "neck")]
+        scored = []
+        for outfit in _combos(wearable):
+            ids = {i["id"] for i in outfit}
+            if all(m in ids for m in must_include if slot(session.wardrobe[m]) not in ("head", "hands", "neck")):
+                scored.append((_evaluate(outfit, summary, occasion), outfit))
+        return scored, accessories
+
+    scored, accessories = _score(recent_elsewhere)
+    if not scored and recent_elsewhere:
+        # Honoring the soft same-session overlap avoidance left nothing: a small closet shouldn't
+        # hard-fail over a preference, so retry without it.
+        scored, accessories = _score([])
     if not scored:
         return json.dumps({"error": "No complete outfit is available. The closet needs at least a top and a bottom "
                                     "(or a dress) that are not in the laundry and not excluded."})
@@ -197,7 +219,11 @@ def build_outfit(session, occasion: str = "class", must_include: list[str] | Non
             break
 
     session.last_outfit = [i["id"] for i in options[0]["items"]]
+    if for_whom:
+        session.recent_picks[for_whom] = [i["id"] for i in options[0]["items"] if i["slot"] in HYGIENE_SLOTS]
     return json.dumps({
+        "date": plan.get("date"),
+        "for_whom": for_whom or "me",
         "targets": {k: summary.get(k) for k in ("indoor_clo_min", "indoor_clo_ideal", "outdoor_clo_min", "outdoor_clo_ideal")},
         "options": options,
         "skipped_in_laundry": laundry,
@@ -241,7 +267,9 @@ def update_wardrobe(session, item_ids: list[str], status: str, worn_by: str | No
     goes, not the whole item. Repeated 'worn' calls past the limit each dirty one more unit.
     status="in_laundry" also sends one more unit each call; status="clean" is a full restock
     (qty_in_laundry back to 0), matching "the laundry is done" rather than "undo one item" (the
-    closet panel's own laundry-count controls handle undoing a single accidental tap).
+    closet panel's own laundry-count controls handle undoing a single accidental tap). A separate
+    lifetime_wears counter also increments on every "worn" call and is never reset by "clean" or
+    anything else, unlike wears (which tracks the current wash cycle); wardrobe_stats reads it.
 
     worn_by optionally labels who is wearing the item today (e.g. "me" or a friend's name), for a
     closet shared by more than one person. worn_for optionally labels which day it's set aside for
@@ -264,6 +292,7 @@ def update_wardrobe(session, item_ids: list[str], status: str, worn_by: str | No
         qty = item.get("qty", 1)
         if status == "worn":
             item["wears"] += 1
+            item["lifetime_wears"] = item.get("lifetime_wears", 0) + 1
             if item["wears"] >= wear_limit(item):
                 item["qty_in_laundry"] = min(qty, item.get("qty_in_laundry", 0) + 1)
                 needs_laundry.append(item["name"])
@@ -298,8 +327,10 @@ TOOLS = [
                 "Pick the best outfits from the user's closet for the most recent plan_day_warmth result. "
                 "Skips items in the laundry, checks warmth indoors and outdoors, accounts for rain and wind, "
                 "and adds gloves/hat/scarf if needed. Returns up to 3 ranked options. "
-                "Always call plan_day_warmth first. For a shared closet, pass for_whom so one person's "
-                "current pick isn't offered to someone else."
+                "Always call plan_day_warmth first. For a shared closet, pass for_whom: a top, bottom, dress, "
+                "legwear or sock someone else already has on is left out, and this call also automatically "
+                "steers away from whatever skin-touching items a different for_whom was most recently picked "
+                "for this session, even before anything is confirmed with update_wardrobe."
             ),
             "parameters": {
                 "type": "object",
@@ -311,8 +342,11 @@ TOOLS = [
                                 "description": "Item ids the user does not want today."},
                     "for_whom": {"type": "string",
                                  "description": "Who this outfit is for, e.g. 'me' or a name. Only needed when "
-                                                "more than one person shares this closet; items someone else is "
-                                                "currently wearing (see update_wardrobe) are left out."},
+                                                "more than one person shares this closet; a top, bottom, dress, "
+                                                "legwear or socks someone else currently has on (see "
+                                                "update_wardrobe) is left out for hygiene, until laundered. "
+                                                "Outerwear, mid-layers, shoes and accessories stay available to "
+                                                "everyone regardless of who has them on."},
                 },
                 "required": [],
             },

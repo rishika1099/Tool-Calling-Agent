@@ -52,6 +52,12 @@ CASES = [
      lambda c: any(x["name"] == "record_comfort_feedback" and x["args"].get("feeling") == "too_cold" for x in c)),
     ("I'm biking to work tomorrow at 8am, about 25 minutes. What should I wear?",
      lambda c: segment_has(c, "activity", "biking")),
+    ("I'm walking 20 minutes to class at 9am in heavy rain. Is my closet actually ready for this kind of weather?",
+     lambda c: before(c, "plan_day_warmth", "suggest_wardrobe_gaps")),
+    ("How many clean tops do I have left? Do I need to do laundry soon?",
+     lambda c: "plan_laundry" in names(c)),
+    ("What do I actually wear the most? Is anything in my closet basically untouched?",
+     lambda c: "wardrobe_stats" in names(c)),
 ]
 
 

@@ -177,6 +177,7 @@ def add_item(session, fields: dict) -> dict:
         "worn_for": None,
         "qty": 1,
         "qty_in_laundry": 0,
+        "lifetime_wears": 0,
     }
     session.wardrobe[item_id] = item
     return item

@@ -7,7 +7,7 @@ from fastapi.testclient import TestClient
 import app as app_module
 from app import get_session
 from tools import run_tool
-from tools.catalog import wear_limit
+from tools.catalog import slot, wear_limit
 
 
 def test_list_wardrobe_reports_wear_limit():
@@ -165,6 +165,21 @@ SHARED_PLAN = {"summary": {"outdoor_clo_min": 0.6, "outdoor_clo_ideal": 0.9,
                             "indoor_clo_min": 0.4, "indoor_clo_ideal": 0.6, "max_wind_mph": 5}}
 
 
+def test_build_outfit_result_carries_its_own_date_and_for_whom():
+    # The frontend pairs each build_outfit result with its own day and person directly from the
+    # result itself (not by tracking the most recent plan_day_warmth/for_whom seen in call order),
+    # so a multi-day or multi-person answer tags the right day and name even if the model doesn't
+    # call plan_day_warmth immediately before every build_outfit.
+    _, session = get_session(None)
+    session.last_plan = {**SHARED_PLAN, "date": "2026-10-09"}
+    result = json.loads(run_tool("build_outfit", {"for_whom": "Alex"}, session))
+    assert result["date"] == "2026-10-09"
+    assert result["for_whom"] == "Alex"
+
+    no_for_whom = json.loads(run_tool("build_outfit", {}, session))
+    assert no_for_whom["for_whom"] == "me"  # defaults to "me" when omitted (single-user case)
+
+
 def test_partially_dirty_item_still_counts_as_available_to_build_outfit():
     # jeans' wear limit is 5, so one pair of 2 owned goes to the laundry well before
     # the item becomes fully unavailable.
@@ -191,6 +206,54 @@ def test_build_outfit_for_whom_excludes_items_claimed_by_someone_else():
 
     for_me = json.loads(run_tool("build_outfit", {"for_whom": "me", "must_include": ["jeans-indigo"]}, session))
     assert "jeans-indigo" in {i["id"] for i in for_me["options"][0]["items"]}  # still available to its own wearer
+
+
+def test_build_outfit_for_whom_still_offers_outerwear_and_shoes_someone_else_has_on():
+    # Hygiene exclusion only applies to tops/bottoms/dresses/legwear/socks; a coat or shoes are
+    # fine to suggest to someone else even while another person currently has them on.
+    _, session = get_session(None)
+    session.last_plan = SHARED_PLAN
+    run_tool("update_wardrobe", {"item_ids": ["parka-black", "boots-leather"], "status": "worn", "worn_by": "me"},
+             session)
+
+    for_other = json.loads(run_tool("build_outfit", {"for_whom": "Alex", "must_include": ["parka-black", "boots-leather"]},
+                                     session))
+    picked = {i["id"] for i in for_other["options"][0]["items"]}
+    assert {"parka-black", "boots-leather"} <= picked
+    assert for_other["claimed_by_someone_else"] == []
+
+
+def test_build_outfit_steers_a_different_for_whom_away_from_the_same_hygiene_items():
+    # Asked about two people in the same reply, before either has actually claimed anything with
+    # update_wardrobe: the second person's build_outfit call should automatically avoid repeating
+    # the first person's exact top/bottom/socks, without the model needing to pass exclude itself.
+    _, session = get_session(None)
+    session.last_plan = SHARED_PLAN
+    me = json.loads(run_tool("build_outfit", {"for_whom": "me"}, session))
+    me_hygiene = {i["id"] for i in me["options"][0]["items"] if i["slot"] in ("base_top", "bottom", "socks")}
+
+    alex = json.loads(run_tool("build_outfit", {"for_whom": "Alex"}, session))
+    alex_hygiene = {i["id"] for i in alex["options"][0]["items"] if i["slot"] in ("base_top", "bottom", "socks")}
+    assert not (me_hygiene & alex_hygiene)  # no shared top/bottom/socks between the two picks
+
+
+def test_build_outfit_overlap_avoidance_backs_off_when_nothing_else_is_available():
+    # If honoring the soft avoidance would leave no outfit at all, it's dropped rather than
+    # failing the call outright - a small closet shouldn't hard-break over a soft preference.
+    _, session = get_session(None)
+    session.last_plan = SHARED_PLAN
+    for item in session.wardrobe.values():
+        if slot(item) in ("base_top", "bottom", "one_piece") and item["id"] not in ("tee-white", "jeans-indigo"):
+            item["status"] = "in_laundry"
+
+    me = json.loads(run_tool("build_outfit", {"for_whom": "me", "must_include": ["tee-white", "jeans-indigo"]}, session))
+    assert {"tee-white", "jeans-indigo"} <= {i["id"] for i in me["options"][0]["items"]}
+
+    # The only clean top and bottom in the whole closet are the ones "me" just got - Alex's call
+    # must still succeed, reusing them, instead of erroring with "no complete outfit available".
+    alex = json.loads(run_tool("build_outfit", {"for_whom": "Alex"}, session))
+    assert "error" not in alex
+    assert {"tee-white", "jeans-indigo"} <= {i["id"] for i in alex["options"][0]["items"]}
 
 
 def test_build_outfit_without_for_whom_ignores_worn_by():
