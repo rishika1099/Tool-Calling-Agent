@@ -65,6 +65,20 @@ def test_manual_laundry_toggle_is_unaffected_by_wear_limit():
     assert "note" not in result
 
 
+def test_manual_laundry_toggle_still_counts_as_a_lifetime_wear():
+    # Reported: tapping a closet tile straight to "in the wash" (no "worn" call first, e.g. the
+    # closet panel's own tap-to-toggle) left wardrobe_stats calling the item "never worn" even
+    # though sending something to the wash means it was used.
+    _, session = get_session(None)
+    run_tool("update_wardrobe", {"item_ids": ["shirt-flannel"], "status": "in_laundry"}, session)
+    assert session.wardrobe["shirt-flannel"]["lifetime_wears"] == 1
+    assert session.wardrobe["shirt-flannel"]["wears"] == 0  # still unaffected, per the test above
+
+    # A second toggle on an item already fully in the laundry doesn't count again.
+    run_tool("update_wardrobe", {"item_ids": ["shirt-flannel"], "status": "in_laundry"}, session)
+    assert session.wardrobe["shirt-flannel"]["lifetime_wears"] == 1
+
+
 def test_update_wardrobe_sets_and_clears_worn_by():
     _, session = get_session(None)
     result = json.loads(run_tool("update_wardrobe",

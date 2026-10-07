@@ -268,8 +268,10 @@ def update_wardrobe(session, item_ids: list[str], status: str, worn_by: str | No
     status="in_laundry" also sends one more unit each call; status="clean" is a full restock
     (qty_in_laundry back to 0), matching "the laundry is done" rather than "undo one item" (the
     closet panel's own laundry-count controls handle undoing a single accidental tap). A separate
-    lifetime_wears counter also increments on every "worn" call and is never reset by "clean" or
-    anything else, unlike wears (which tracks the current wash cycle); wardrobe_stats reads it.
+    lifetime_wears counter increments once per call that actually dirties a previously-clean unit,
+    whether that happens via "worn" or a direct "in_laundry" (e.g. the closet tile's manual toggle,
+    which deliberately never touches wears/wear_limit) - both mean the item got used. Unlike wears
+    (which tracks the current wash cycle), it's never reset by "clean"; wardrobe_stats reads it.
 
     worn_by optionally labels who is wearing the item today (e.g. "me" or a friend's name), for a
     closet shared by more than one person. worn_for optionally labels which day it's set aside for
@@ -303,8 +305,15 @@ def update_wardrobe(session, item_ids: list[str], status: str, worn_by: str | No
         elif status == "clean":
             item["qty_in_laundry"] = 0
             item["wears"] = 0
-        else:  # "in_laundry": one more unit goes to the wash, same action as a laundry-panel tap
-            item["qty_in_laundry"] = min(qty, item.get("qty_in_laundry", 0) + 1)
+        else:  # "in_laundry": one more unit goes to the wash, same action as a laundry-panel tap.
+            # Marking something dirty directly (without going through "worn" first, e.g. tapping
+            # the closet tile straight to laundry) still means it got used - it still counts for
+            # wardrobe_stats, even though it deliberately doesn't touch wears/wear_limit (see
+            # test_manual_laundry_toggle_is_unaffected_by_wear_limit).
+            prev_dirty = item.get("qty_in_laundry", 0)
+            item["qty_in_laundry"] = min(qty, prev_dirty + 1)
+            if item["qty_in_laundry"] > prev_dirty:
+                item["lifetime_wears"] = item.get("lifetime_wears", 0) + 1
         sync_laundry_status(item)
         # Still tag it even if this exact "worn" call is what just sent the last clean unit to the
         # laundry: the user is wearing it *right now*, today, even though it'll need a wash after -
