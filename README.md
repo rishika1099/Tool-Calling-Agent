@@ -42,7 +42,7 @@ Each piece has an AI-generated product-style photo (an illustration of the demo 
 |---|---|---|
 | `get_forecast_window` | shared | Hour-by-hour forecast for part of a day (Open-Meteo, external API) |
 | `get_weather_alerts` | shared | Active National Weather Service alerts, e.g. Wind Chill Advisory (external API, US only) |
-| `plan_day_warmth` | Rishika | Clothing warmth needed per segment of the day, indoor vs outdoor, with a layering plan and any active alerts (Shreya added the `cold_sensitivity` override, for planning a second person sharing the closet) |
+| `plan_day_warmth` | Rishika, Shreya | Clothing warmth needed per segment of the day, indoor vs outdoor, with a layering plan and any active alerts (Shreya added the `cold_sensitivity` override, for planning a second person sharing the closet) |
 | `set_cold_sensitivity` | Rishika | Remembers whether the user runs cold, average or warm |
 | `record_comfort_feedback` | Rishika | Learns from how an outfit felt ("I was freezing"): nudges future plans 0.1 clo warmer or cooler, up to 0.3 |
 | `build_outfit` | Rishika, Shreya | Ranks outfits from the closet against the plan (warmth, rain, wind, occasion, laundry); Shreya added the shared-closet `for_whom` filter so one person's current pick isn't offered to another |
