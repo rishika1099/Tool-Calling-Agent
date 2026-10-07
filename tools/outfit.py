@@ -214,6 +214,19 @@ def build_outfit(session, occasion: str = "class", must_include: list[str] | Non
     # same-day variety guard, not just the explicitly-shared-closet case.
     who_key = for_whom or "me"
 
+    # plan_day_warmth stamps its own result with who it was for; if that doesn't match who this
+    # build is for, the plan's clo targets (and thus the whole outfit) reflect the WRONG person's
+    # warmth needs - most likely because cold_sensitivity was left out of the plan_day_warmth call
+    # for this person, or their plan got skipped and this person's build is reusing someone else's.
+    # Not a hard error (plan_for is only ever set by real plan_day_warmth calls, never by the literal
+    # plan dicts some tests construct directly, so this never fires for those) - just a loud,
+    # actionable note in the result so the mistake doesn't silently pass as a normal answer.
+    plan_for = plan.get("for_whom")
+    plan_mismatch = (f"This used the most recent plan_day_warmth, which was built for '{plan_for}', "
+                      f"not '{who_key}'. If their cold_sensitivity differs, call plan_day_warmth again "
+                      f"for '{who_key}' (with their own cold_sensitivity) before trusting this outfit."
+                      ) if plan_for and plan_for.strip().lower() != who_key.strip().lower() else None
+
     # Only soft-avoid an item once every owned unit is already claimed by someone else's recent
     # pick *for this same day*: owning 2 pairs of the same boots means two people genuinely can
     # get offered "the same boots" without it being a physical conflict, so count claims against
@@ -303,15 +316,18 @@ def build_outfit(session, occasion: str = "class", must_include: list[str] | Non
 
     session.last_outfit = [i["id"] for i in options[0]["items"]]
     session.recent_picks[(who_key, day)] = [i["id"] for i in options[0]["items"]]
-    return json.dumps({
+    result = {
         "date": plan.get("date"),
-        "for_whom": for_whom or "me",
+        "for_whom": who_key,
         "targets": {k: summary.get(k) for k in ("indoor_clo_min", "indoor_clo_ideal", "outdoor_clo_min", "outdoor_clo_ideal")},
         "options": options,
         "skipped_in_laundry": laundry,
         "claimed_by_someone_else": claimed,
         "style_check": "on" if options[0]["style"] else "not built yet",
-    })
+    }
+    if plan_mismatch:
+        result["warning"] = plan_mismatch
+    return json.dumps(result)
 
 
 def list_wardrobe(session, slot_filter: str | None = None) -> str:

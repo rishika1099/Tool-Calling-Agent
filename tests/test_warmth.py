@@ -77,6 +77,34 @@ def test_cold_sensitivity_override_plans_for_someone_else_without_touching_the_s
     assert mine["cold_sensitivity"] == "average" and mine["personal_adjustment_clo"] == pytest.approx(0.1)
 
 
+def test_plan_day_warmth_defaults_for_whom_to_me(cold_day):
+    _, session = get_session(None)
+    assert plan(session)["for_whom"] == "me"
+    other = json.loads(run_tool("plan_day_warmth", {"segments": DAY, "for_whom": "Alex"}, session))
+    assert other["for_whom"] == "Alex"
+
+
+def test_build_outfit_warns_when_the_plan_was_for_someone_else(cold_day):
+    # Reported: the model mixed up two people's cold sensitivity - traced to build_outfit silently
+    # trusting whichever plan_day_warmth ran most recently with no way to tell it was the wrong
+    # person's. for_whom on plan_day_warmth plus this check turns that into a visible warning.
+    _, session = get_session(None)
+    run_tool("plan_day_warmth", {"segments": DAY, "for_whom": "me"}, session)
+    result = json.loads(run_tool("build_outfit", {"for_whom": "Alex"}, session))
+    assert "warning" in result
+    assert "'me'" in result["warning"] and "'Alex'" in result["warning"]
+
+
+def test_build_outfit_no_warning_when_for_whom_matches_the_plan(cold_day):
+    _, session = get_session(None)
+    run_tool("plan_day_warmth", {"segments": DAY, "for_whom": "Alex", "cold_sensitivity": "runs_cold"}, session)
+    result = json.loads(run_tool("build_outfit", {"for_whom": "Alex"}, session))
+    assert "warning" not in result
+    # The plain single-user case (no for_whom anywhere) shouldn't warn either.
+    run_tool("plan_day_warmth", {"segments": DAY}, session)
+    assert "warning" not in json.loads(run_tool("build_outfit", {}, session))
+
+
 def test_plan_day_warmth_rejects_unknown_cold_sensitivity_override(cold_day):
     _, session = get_session(None)
     args = {"segments": DAY, "cold_sensitivity": "freezing"}

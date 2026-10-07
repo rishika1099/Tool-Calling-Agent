@@ -148,7 +148,7 @@ def _parse_start(start: str) -> tuple[int, int]:
 
 
 def plan_day_warmth(session, segments: list[dict], location: str = "New York", day: str = "today",
-                     cold_sensitivity: str | None = None) -> str:
+                     cold_sensitivity: str | None = None, for_whom: str | None = None) -> str:
     """Warmth needed (clo) for each part of a day, plus a layering plan.
 
     By default this plans for the primary user: it reads session.cold_sensitivity and adds
@@ -157,6 +157,11 @@ def plan_day_warmth(session, segments: list[dict], location: str = "New York", d
     user's saved setting: the override replaces session.cold_sensitivity for this call only, and
     comfort_offset is deliberately not added, since that adjustment was learned from the primary
     user's own feedback and should not be assumed for another person.
+
+    for_whom labels who this specific plan is for (defaults to "me"), stored in the result so
+    build_outfit can tell if it's about to use a plan that was actually built for someone else - a
+    plain-text warning in that case, not a hard block, since build_outfit always trusts whichever
+    plan_day_warmth result ran most recently and has no way to re-derive the right one on its own.
     """
     if not segments:
         return json.dumps({"error": "Give at least one segment, e.g. {'start': '08:00', 'minutes': 20, 'activity': 'walking', 'setting': 'outdoors'}."})
@@ -234,6 +239,7 @@ def plan_day_warmth(session, segments: list[dict], location: str = "New York", d
     plan = {
         "location": place["name"],
         "date": wanted.isoformat(),
+        "for_whom": for_whom or "me",
         "cold_sensitivity": sensitivity,
         "personal_adjustment_clo": round(offset, 2),
         "buildings_heated": heating_on,
@@ -288,7 +294,12 @@ TOOLS = [
                 "and a summary with indoor vs outdoor needs and how many clo of removable layers to carry. "
                 "Call this first for any 'what should I wear' question, then call build_outfit. "
                 "Break the user's description into segments; include indoor parts (class, office, subway) "
-                "because they decide what can be worn underneath."
+                "because they decide what can be worn underneath. For a second person sharing the closet, "
+                "call this separately for them too, passing their own cold_sensitivity - even if their "
+                "schedule is word-for-word identical to the primary user's. build_outfit has no sensitivity "
+                "parameter of its own; it only ever uses whichever plan_day_warmth result ran most recently, "
+                "so reusing one call for both people would silently apply one person's warmth preference to "
+                "both of them."
             ),
             "parameters": {
                 "type": "object",
@@ -313,10 +324,22 @@ TOOLS = [
                     "day": {"type": "string", "description": "'today', 'tomorrow', or YYYY-MM-DD within the next 7 days."},
                     "cold_sensitivity": {
                         "type": "string", "enum": list(SENSITIVITY_OFFSET),
-                        "description": "Only when planning for someone other than the primary user who shares this "
-                                       "chat, e.g. a friend or roommate. Overrides the saved setting for this call "
-                                       "only and skips the user's own learned comfort adjustment. Omit for the "
-                                       "primary user.",
+                        "description": "Required every time this call is for someone other than the primary user, "
+                                       "e.g. a friend or roommate - never leave it out for them, even if you already "
+                                       "called this for the primary user moments ago with an identical schedule. "
+                                       "Omitting it does NOT mean 'neutral': it silently falls back to the primary "
+                                       "user's own saved sensitivity, which would plan the wrong person's warmth "
+                                       "needs for them. Overrides the saved setting for this call only and skips "
+                                       "the user's own learned comfort adjustment. Omit only when this call really "
+                                       "is for the primary user themselves.",
+                    },
+                    "for_whom": {
+                        "type": "string",
+                        "description": "Who this plan is for, e.g. 'me' or a name - pass the same label you'll use "
+                                       "on the matching build_outfit call. Only needed when more than one person "
+                                       "shares this closet; omit for a single user. build_outfit warns if it ends "
+                                       "up using a plan built for someone else, so this is what makes that catch "
+                                       "possible.",
                     },
                 },
                 "required": ["segments"],

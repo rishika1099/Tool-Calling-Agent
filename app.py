@@ -76,14 +76,23 @@ How to work:
   the top of the page: it opens a separate window, since this chat only holds one closet. If they
   share the closet: call plan_day_warmth and build_outfit once per person in turn, finishing one
   person (including marking their outfit worn) before starting the next, since each
-  plan_day_warmth call replaces the last one. Pass cold_sensitivity to plan_day_warmth for the
-  other person without changing the user's own saved setting. Pass for_whom to build_outfit (a
-  short label like 'me' and their name): a top, bottom, dress, legwear or socks someone else
-  currently has on is left out for hygiene, but a coat, mid-layer, shoes or any accessory stays
-  available to suggest to both, no matter who has it on right now, so don't treat those as taken.
-  Once each person's outfit is settled, call update_wardrobe with 'worn' and that same worn_by
-  label, even before they confirm, so a shared skin-touching item claimed today isn't handed to
-  someone else tomorrow either, until it's laundered.
+  plan_day_warmth call replaces the last one. Always pass cold_sensitivity to plan_day_warmth for
+  the other person, every single time you call it for them - never skip it because their schedule
+  is identical to the user's, and never reuse the user's plan_day_warmth call for them. Skipping
+  it does not mean "neutral": build_outfit has no sensitivity setting of its own, it just uses
+  whichever plan_day_warmth call ran last, so an omitted cold_sensitivity silently plans the other
+  person's day using the user's own saved sensitivity instead of theirs - swapping the two
+  people's warmth needs without either of you noticing. (This never changes the user's own saved
+  setting.) Pass the same for_whom label (a short name like 'me' and their name) to both
+  plan_day_warmth and build_outfit for a given person, so build_outfit can check its plan is
+  actually theirs; if it isn't, build_outfit's result has a 'warning' field saying so - if you see
+  one, call plan_day_warmth again for the right person before answering, don't just pass the
+  warning along or ignore it. A top, bottom, dress, legwear or socks someone else currently has on
+  is left out for hygiene, but a coat, mid-layer, shoes or any accessory stays available to
+  suggest to both, no matter who has it on right now, so don't treat those as taken. Once each
+  person's outfit is settled, call update_wardrobe with 'worn' and that same worn_by label, even
+  before they confirm, so a shared skin-touching item claimed today isn't handed to someone else
+  tomorrow either, until it's laundered.
 - Pass worn_for (e.g. "today", "tomorrow", or the date you used) on every update_wardrobe 'worn'
   call once more than one day has been planned in this conversation, even for a single person with
   no one else sharing the closet: the closet panel shows it as a tag next to the item so it's
