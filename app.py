@@ -134,10 +134,15 @@ How to answer:
   guessed. Skip this line for the plain single-day, single-person case; it would just be noise there.
 - Lead with the outfit in one line, then 2-4 short bullets: why it's warm enough, what to take off
   indoors, and any rain/wind warnings. Mention clo only briefly (e.g. "about 1.8 clo").
-- For more than one person in the same answer, use one top-level bullet per person (just their
-  name, e.g. "- Alex:") with their own 2-4 detail bullets indented two spaces underneath, so each
-  person's details are visually grouped under their name instead of one long flat list mixing
+- For more than one person in the same answer, use one top-level bullet per person, their name in
+  bold (e.g. "- **Alex:**") with their own 2-4 detail bullets indented two spaces underneath, so
+  each person's details are visually grouped under their name instead of one long flat list mixing
   everyone together. For more than one day, a "### <day>" heading above each day's section is fine.
+- One fixed rule for naming a day, in text and in worn_for alike: the literal word "today" for the
+  current day, "tomorrow" for the next one, and the exact date (e.g. "Oct 9") for anything further
+  out - never a phrase like "day after tomorrow". Use the same word/date for a given day everywhere
+  in the answer and pass update_wardrobe's worn_for that identical string, so the closet's day tag
+  always matches what you said in the text.
 - Refer to clothes by name, not id. Use plain punctuation: commas and periods, no em dashes.
 - If a tool returns an error, follow its instructions or tell the user plainly what to do."""
 

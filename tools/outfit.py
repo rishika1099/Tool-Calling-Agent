@@ -6,6 +6,7 @@ from scan_garment, and the style score from style.style_score.
 
 import itertools
 import json
+from collections import Counter
 
 from . import style
 from .catalog import INDOOR_SLOTS, clo, is_windproof, keeps_rain_out, slot, wear_limit, wet_retention
@@ -145,12 +146,16 @@ def build_outfit(session, occasion: str = "class", must_include: list[str] | Non
     (and, once laundered, each needs their own wash, not a pass straight to someone else).
     This only applies to garments worn directly against skin (tops, bottoms, dresses, legwear,
     socks) for hygiene; outerwear, mid-layers, shoes and accessories stay available to everyone
-    regardless of who currently has them on. for_whom also steers this pick away from whatever
-    top/bottom/dress/legwear/socks was most recently picked for a *different* for_whom this
-    session, so two people asked about in the same answer don't both get offered the identical
-    physical garment before either has actually claimed anything with update_wardrobe; this is a
-    soft preference, not a hard rule, and backs off automatically if honoring it would leave no
-    outfit at all. Omit for a single user; nothing changes for that case.
+    across different people and days without needing a wash in between - but NOT simultaneously:
+    a single pair of boots is still one physical object, so for_whom also steers this pick away
+    from every item (every slot, not just the hygiene-sensitive ones) most recently picked for a
+    *different* for_whom this session, so two people asked about in the same answer don't both get
+    offered the identical physical item - coat or shoes included - before either has actually
+    claimed anything with update_wardrobe. This only kicks in once every owned unit of that item
+    is already claimed this way: owning 2 of something (set from the closet panel) means two
+    people can legitimately both get offered it. This is a soft preference, not a hard rule, and
+    backs off automatically if honoring it would leave no outfit at all. Omit for a single user;
+    nothing changes for that case.
     """
     plan = session.last_plan
     if not plan:
@@ -172,8 +177,15 @@ def build_outfit(session, occasion: str = "class", must_include: list[str] | Non
                if i["status"] != "in_laundry" and _claimed_by_someone_else(i)]
     summary = plan["summary"]
 
-    recent_elsewhere = [iid for who, ids in session.recent_picks.items()
-                         if for_whom and who.strip().lower() != for_whom.strip().lower() for iid in ids]
+    # Only soft-avoid an item once every owned unit is already claimed by someone else's recent
+    # pick: owning 2 pairs of the same boots means two people genuinely can get offered "the same
+    # boots" without it being a physical conflict, so count claims against qty rather than
+    # excluding on the first match.
+    elsewhere_claims = Counter(
+        iid for who, ids in session.recent_picks.items()
+        if for_whom and who.strip().lower() != for_whom.strip().lower() for iid in ids)
+    recent_elsewhere = [iid for iid, claims in elsewhere_claims.items()
+                         if claims >= session.wardrobe.get(iid, {}).get("qty", 1)]
 
     def _score(soft_avoid: list[str]):
         avoid = set(exclude) | set(soft_avoid)
@@ -220,7 +232,7 @@ def build_outfit(session, occasion: str = "class", must_include: list[str] | Non
 
     session.last_outfit = [i["id"] for i in options[0]["items"]]
     if for_whom:
-        session.recent_picks[for_whom] = [i["id"] for i in options[0]["items"] if i["slot"] in HYGIENE_SLOTS]
+        session.recent_picks[for_whom] = [i["id"] for i in options[0]["items"]]
     return json.dumps({
         "date": plan.get("date"),
         "for_whom": for_whom or "me",
@@ -268,18 +280,21 @@ def update_wardrobe(session, item_ids: list[str], status: str, worn_by: str | No
     status="in_laundry" also sends one more unit each call; status="clean" is a full restock
     (qty_in_laundry back to 0), matching "the laundry is done" rather than "undo one item" (the
     closet panel's own laundry-count controls handle undoing a single accidental tap). A separate
-    lifetime_wears counter also increments on every "worn" call and is never reset by "clean" or
-    anything else, unlike wears (which tracks the current wash cycle); wardrobe_stats reads it.
+    lifetime_wears counter increments once per call that actually dirties a previously-clean unit,
+    whether that happens via "worn" or a direct "in_laundry" (e.g. the closet tile's manual toggle,
+    which deliberately never touches wears/wear_limit) - both mean the item got used. Unlike wears
+    (which tracks the current wash cycle), it's never reset by "clean"; wardrobe_stats reads it.
 
     worn_by optionally labels who is wearing the item today (e.g. "me" or a friend's name), for a
     closet shared by more than one person. worn_for optionally labels which day it's set aside for
     (e.g. "today", "tomorrow", or the date used in plan_day_warmth) once more than one day has been
     planned in this conversation, even for a single person. Both only take effect alongside
-    status="worn", and only on items that end up actually staying "worn" (not ones that hit their
-    wear limit and go straight to the laundry). Any other status clears both labels: nobody
-    currently "has" an item, for anyone or any day, once it isn't being worn right now.
-    build_outfit's for_whom filter reads worn_by to avoid handing one person's current pick to
-    someone else before it is laundered.
+    status="worn" - including on an item whose wear limit this exact call reaches (you're still
+    wearing it right now, even though it's also headed to the laundry after); any OTHER status, or
+    a "worn" call on an item that was already at its limit before this call, clears both labels,
+    since nobody currently "has" a plain dirty item that nobody just put on. build_outfit's
+    for_whom filter reads worn_by to avoid handing one person's current pick to someone else
+    before it is laundered.
     """
     if status not in STATUSES:
         return json.dumps({"error": f"status must be one of {STATUSES}."})
@@ -290,23 +305,37 @@ def update_wardrobe(session, item_ids: list[str], status: str, worn_by: str | No
     for item_id in item_ids:
         item = session.wardrobe[item_id]
         qty = item.get("qty", 1)
+        just_worn_out = False  # this exact call dirtied a previously-clean unit, not an already-laundered one
         if status == "worn":
             item["wears"] += 1
             item["lifetime_wears"] = item.get("lifetime_wears", 0) + 1
             if item["wears"] >= wear_limit(item):
-                item["qty_in_laundry"] = min(qty, item.get("qty_in_laundry", 0) + 1)
+                prev_dirty = item.get("qty_in_laundry", 0)
+                item["qty_in_laundry"] = min(qty, prev_dirty + 1)
+                just_worn_out = item["qty_in_laundry"] > prev_dirty
                 needs_laundry.append(item["name"])
         elif status == "clean":
             item["qty_in_laundry"] = 0
             item["wears"] = 0
-        else:  # "in_laundry": one more unit goes to the wash, same action as a laundry-panel tap
-            item["qty_in_laundry"] = min(qty, item.get("qty_in_laundry", 0) + 1)
+        else:  # "in_laundry": one more unit goes to the wash, same action as a laundry-panel tap.
+            # Marking something dirty directly (without going through "worn" first, e.g. tapping
+            # the closet tile straight to laundry) still means it got used - it still counts for
+            # wardrobe_stats, even though it deliberately doesn't touch wears/wear_limit (see
+            # test_manual_laundry_toggle_is_unaffected_by_wear_limit).
+            prev_dirty = item.get("qty_in_laundry", 0)
+            item["qty_in_laundry"] = min(qty, prev_dirty + 1)
+            if item["qty_in_laundry"] > prev_dirty:
+                item["lifetime_wears"] = item.get("lifetime_wears", 0) + 1
         sync_laundry_status(item)
-        still_worn = item["status"] == "worn"
+        # Still tag it even if this exact "worn" call is what just sent the last clean unit to the
+        # laundry: the user is wearing it *right now*, today, even though it'll need a wash after -
+        # that's not the same as "nobody has this, it's just sitting dirty" (a bare "in_laundry" call
+        # with no wear behind it, which still clears the tag as before).
+        still_has_it = item["status"] == "worn" or just_worn_out
         item["worn_by"] = worn_by.strip()[:40] if (
-            isinstance(worn_by, str) and worn_by.strip() and still_worn) else None
+            isinstance(worn_by, str) and worn_by.strip() and still_has_it) else None
         item["worn_for"] = worn_for.strip()[:40] if (
-            isinstance(worn_for, str) and worn_for.strip() and still_worn) else None
+            isinstance(worn_for, str) and worn_for.strip() and still_has_it) else None
         updated.append({"id": item_id, "name": item["name"], "status": item["status"], "wears": item["wears"],
                          "worn_by": item["worn_by"], "worn_for": item["worn_for"],
                          "qty": qty, "qty_in_laundry": item["qty_in_laundry"]})
@@ -329,8 +358,9 @@ TOOLS = [
                 "and adds gloves/hat/scarf if needed. Returns up to 3 ranked options. "
                 "Always call plan_day_warmth first. For a shared closet, pass for_whom: a top, bottom, dress, "
                 "legwear or sock someone else already has on is left out, and this call also automatically "
-                "steers away from whatever skin-touching items a different for_whom was most recently picked "
-                "for this session, even before anything is confirmed with update_wardrobe."
+                "steers away from every item (any slot, including coats and shoes - a single pair of boots "
+                "can't be on two people on the same day) a different for_whom was most recently picked for "
+                "this session, even before anything is confirmed with update_wardrobe."
             ),
             "parameters": {
                 "type": "object",

@@ -27,8 +27,9 @@ class Session:
     setup_done: bool = False  # finished "Build your digital closet" (or chose the demo closet)
     previews: list[str] = field(default_factory=list)  # ids of try-on images, oldest first
     recent_picks: dict[str, list[str]] = field(default_factory=dict)  # for_whom -> their most recent
-    # build_outfit top pick's skin-touching item ids, so build_outfit can automatically steer a
-    # different for_whom away from suggesting the exact same top/bottom/dress/legwear/socks
+    # build_outfit top pick's item ids (every slot, not just skin-touching ones - a single pair of
+    # boots is still one physical object), so build_outfit can automatically steer a different
+    # for_whom away from suggesting the exact same item before either has actually claimed anything
 
     @classmethod
     def new(cls, system_prompt: str, session_id: str = "") -> "Session":

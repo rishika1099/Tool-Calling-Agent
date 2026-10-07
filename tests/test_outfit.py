@@ -65,6 +65,20 @@ def test_manual_laundry_toggle_is_unaffected_by_wear_limit():
     assert "note" not in result
 
 
+def test_manual_laundry_toggle_still_counts_as_a_lifetime_wear():
+    # Reported: tapping a closet tile straight to "in the wash" (no "worn" call first, e.g. the
+    # closet panel's own tap-to-toggle) left wardrobe_stats calling the item "never worn" even
+    # though sending something to the wash means it was used.
+    _, session = get_session(None)
+    run_tool("update_wardrobe", {"item_ids": ["shirt-flannel"], "status": "in_laundry"}, session)
+    assert session.wardrobe["shirt-flannel"]["lifetime_wears"] == 1
+    assert session.wardrobe["shirt-flannel"]["wears"] == 0  # still unaffected, per the test above
+
+    # A second toggle on an item already fully in the laundry doesn't count again.
+    run_tool("update_wardrobe", {"item_ids": ["shirt-flannel"], "status": "in_laundry"}, session)
+    assert session.wardrobe["shirt-flannel"]["lifetime_wears"] == 1
+
+
 def test_update_wardrobe_sets_and_clears_worn_by():
     _, session = get_session(None)
     result = json.loads(run_tool("update_wardrobe",
@@ -75,10 +89,21 @@ def test_update_wardrobe_sets_and_clears_worn_by():
     assert session.wardrobe["jeans-indigo"]["worn_by"] is None
 
 
-def test_worn_by_does_not_stick_to_an_item_that_hits_its_wear_limit():
-    # tee-white's wear limit is 1, so this call sends it straight to the laundry; nobody
-    # "has" a laundered item, so worn_by should not be left set.
+def test_worn_by_still_tags_an_item_on_the_call_that_reaches_its_wear_limit():
+    # tee-white's wear limit is 1, so this call sends it straight to the laundry - but Alex is
+    # wearing it *right now*, today, even though it also needs a wash after, so the tag should
+    # still show who has it instead of silently vanishing the moment it's marked worn.
     _, session = get_session(None)
+    run_tool("update_wardrobe", {"item_ids": ["tee-white"], "status": "worn", "worn_by": "Alex"}, session)
+    assert session.wardrobe["tee-white"]["status"] == "in_laundry"
+    assert session.wardrobe["tee-white"]["worn_by"] == "Alex"
+
+
+def test_worn_by_does_not_stick_to_an_item_already_fully_in_the_laundry():
+    # A second "worn" call on an item that was already at its wear limit (no clean units left)
+    # isn't "being worn right now" in any meaningful sense - nobody picked up a dirty item.
+    _, session = get_session(None)
+    run_tool("update_wardrobe", {"item_ids": ["tee-white"], "status": "worn", "worn_by": "Alex"}, session)
     run_tool("update_wardrobe", {"item_ids": ["tee-white"], "status": "worn", "worn_by": "Alex"}, session)
     assert session.wardrobe["tee-white"]["status"] == "in_laundry"
     assert session.wardrobe["tee-white"]["worn_by"] is None
@@ -101,6 +126,16 @@ def test_update_wardrobe_sets_and_clears_worn_for():
     assert result["updated"][0]["worn_for"] == "tomorrow"
     run_tool("update_wardrobe", {"item_ids": ["jeans-indigo"], "status": "clean"}, session)
     assert session.wardrobe["jeans-indigo"]["worn_for"] is None
+
+
+def test_worn_for_also_still_tags_an_item_on_the_call_that_reaches_its_wear_limit():
+    _, session = get_session(None)
+    result = json.loads(run_tool("update_wardrobe",
+                                  {"item_ids": ["tee-white"], "status": "worn", "worn_by": "me", "worn_for": "today"},
+                                  session))
+    assert session.wardrobe["tee-white"]["status"] == "in_laundry"
+    assert session.wardrobe["tee-white"]["worn_for"] == "today"
+    assert result["updated"][0]["worn_for"] == "today"
 
 
 def test_worn_for_does_not_gate_build_outfit_availability():
@@ -223,18 +258,41 @@ def test_build_outfit_for_whom_still_offers_outerwear_and_shoes_someone_else_has
     assert for_other["claimed_by_someone_else"] == []
 
 
-def test_build_outfit_steers_a_different_for_whom_away_from_the_same_hygiene_items():
+def test_build_outfit_steers_a_different_for_whom_away_from_the_same_items():
     # Asked about two people in the same reply, before either has actually claimed anything with
     # update_wardrobe: the second person's build_outfit call should automatically avoid repeating
-    # the first person's exact top/bottom/socks, without the model needing to pass exclude itself.
+    # the first person's exact picks - every slot, not just hygiene ones. Reported: both people
+    # got offered the same single pair of boots for the same day, which is physically impossible
+    # regardless of whether shoes need a hygiene wash between wearers.
     _, session = get_session(None)
     session.last_plan = SHARED_PLAN
     me = json.loads(run_tool("build_outfit", {"for_whom": "me"}, session))
-    me_hygiene = {i["id"] for i in me["options"][0]["items"] if i["slot"] in ("base_top", "bottom", "socks")}
+    me_ids = {i["id"] for i in me["options"][0]["items"]}
 
     alex = json.loads(run_tool("build_outfit", {"for_whom": "Alex"}, session))
-    alex_hygiene = {i["id"] for i in alex["options"][0]["items"] if i["slot"] in ("base_top", "bottom", "socks")}
-    assert not (me_hygiene & alex_hygiene)  # no shared top/bottom/socks between the two picks
+    alex_ids = {i["id"] for i in alex["options"][0]["items"]}
+    assert not (me_ids & alex_ids)  # no shared item at all between the two same-session picks
+
+
+def test_build_outfit_allows_sharing_an_item_owned_in_multiples():
+    # Owning 2 of something (set from the closet panel) means two people can legitimately both
+    # get offered it - the soft avoid-duplicate check should only kick in once every owned unit
+    # is already claimed, not on the first match. boots-leather is made the only available shoe
+    # so a wrongly-excluded version of this would show up as a missing shoe, not an error (shoes
+    # aren't a required slot), making the difference directly observable without must_include
+    # (which would mask it: an empty scored list falls back to ignoring the avoid-set entirely).
+    _, session = get_session(None)
+    session.last_plan = SHARED_PLAN
+    session.wardrobe["boots-leather"]["qty"] = 2
+    for item in session.wardrobe.values():
+        if slot(item) == "shoes" and item["id"] != "boots-leather":
+            item["status"] = "in_laundry"
+
+    me = json.loads(run_tool("build_outfit", {"for_whom": "me"}, session))
+    assert "boots-leather" in {i["id"] for i in me["options"][0]["items"]}
+
+    alex = json.loads(run_tool("build_outfit", {"for_whom": "Alex"}, session))
+    assert "boots-leather" in {i["id"] for i in alex["options"][0]["items"]}
 
 
 def test_build_outfit_overlap_avoidance_backs_off_when_nothing_else_is_available():
