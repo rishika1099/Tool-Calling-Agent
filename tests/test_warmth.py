@@ -66,6 +66,23 @@ def test_runs_cold_adds_warmth(cold_day):
     assert plan(session)["summary"]["outdoor_clo_ideal"] == pytest.approx(base + 0.2, abs=0.011)
 
 
+def test_cold_sensitivity_override_plans_for_someone_else_without_touching_the_session(cold_day):
+    _, session = get_session(None)
+    run_tool("record_comfort_feedback", {"feeling": "too_cold"}, session)  # session.comfort_offset = 0.1
+    other = json.loads(run_tool("plan_day_warmth", {"segments": DAY, "cold_sensitivity": "runs_warm"}, session))
+    assert other["cold_sensitivity"] == "runs_warm"
+    assert other["personal_adjustment_clo"] == pytest.approx(-0.2)  # no comfort_offset added for the other person
+    assert session.cold_sensitivity == "average" and session.comfort_offset == 0.1  # the user's own state is untouched
+    mine = plan(session)  # a call with no override still uses the user's own setting and feedback
+    assert mine["cold_sensitivity"] == "average" and mine["personal_adjustment_clo"] == pytest.approx(0.1)
+
+
+def test_plan_day_warmth_rejects_unknown_cold_sensitivity_override(cold_day):
+    _, session = get_session(None)
+    args = {"segments": DAY, "cold_sensitivity": "freezing"}
+    assert "cold_sensitivity must be" in json.loads(run_tool("plan_day_warmth", args, session))["error"]
+
+
 def test_heat_law_decides_indoor_temperature(cold_day):
     _, session = get_session(None)
     p = plan(session)
