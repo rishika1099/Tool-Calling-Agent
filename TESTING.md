@@ -86,10 +86,11 @@ Do these on the live URL. Each takes a few minutes.
 
 ## Before submitting
 
-- [x] `uv run pytest` passes (94/94 as of Oct 7, offline, this environment)
+- [x] `uv run pytest` passes (98/98 as of Oct 7, offline, this environment)
 - [ ] `uv run python evals/tool_calls.py` passes 14/14 (needs Gemini credentials - not run in this environment)
 - [ ] Manual checks 1 to 5 done
-- [ ] The three README queries work on the live URL from a clean browser profile
+- [ ] All seven README queries (the original three, plus the multi-person/day one and the three new
+      wardrobe_insights ones added Oct 7) work on the live URL from a clean browser profile
 - [ ] Re-run the "Functionality" and "Tools" rows above marked **needs re-check** - most of PR #17-21's
       changes (multi-day memory, multi-person sharing, item quantity/laundry, day tags, hygiene-scoped
       sharing, "See it on me" defaulting) haven't been checked against the actual deployed app or a real

@@ -37,12 +37,31 @@ IEOR 4570 Project 1. Team: Rishika, Shreya, Kshamaa.
 
 ## Sample queries
 
-1. `I walk 20 minutes to class at 9am, sit in class until 1, then wait 10 minutes for the bus. What should I wear?`
-2. `I always feel cold. Is my grey hoodie enough for a 15 minute walk tonight at 7?`
-3. `My jeans are in the wash. I have an interview downtown tomorrow at 10: a 10 minute walk, 30 minutes on the subway, then an hour indoors.`
+A demo closet of 41 pieces is loaded in every new session, so all seven of these work without
+uploading anything. Each piece has an AI-generated product-style photo (an illustration of the
+demo data, not a real product), and the closet is grouped into sections: tops, knits and layers,
+coats and jackets, bottoms, dresses, shoes, extras. The expected tool calls under each query are
+there so graders can tell at a glance whether the agent did the right thing — the page itself
+shows the same calls, with names/args/results, above every answer.
 
-A demo closet of 41 pieces is loaded in every new session, so these work without uploading anything.
-Each piece has an AI-generated product-style photo (an illustration of the demo data, not a real product), and the closet is grouped into sections: tops, knits and layers, coats and jackets, bottoms, dresses, shoes, extras.
+1. `I walk 20 minutes to class at 9am, sit in class until 1, then wait 10 minutes for the bus. What should I wear?`
+   Expected: `plan_day_warmth` → `build_outfit`.
+2. `I always feel cold. Is my grey hoodie enough for a 15 minute walk tonight at 7?`
+   Expected: `set_cold_sensitivity` → `plan_day_warmth` → `build_outfit`.
+3. `My jeans are in the wash. I have an interview downtown tomorrow at 10: a 10 minute walk, 30 minutes on the subway, then an hour indoors.`
+   Expected: `update_wardrobe` → `plan_day_warmth` → `build_outfit` (occasion `interview`, no jeans in the outfit).
+4. `My sister and I share the same closet and have the exact same schedule. I run super warm but she runs very cold. For both today and tomorrow: we walk 15 minutes to class at 8:30am, sit indoors for about 4 hours, then walk 5 minutes to bus stop and then back home from bus. What should each of us wear?`
+   Expected: `set_cold_sensitivity` (for you), then `plan_day_warmth` and `build_outfit` once per day and
+   person — up to 4 of each for 2 days × 2 people, each with its own forecast and outfit since your
+   sensitivities differ — and `update_wardrobe` once each day/person's outfit is settled. Exercises
+   multi-person sharing, differing cold sensitivity, the two-day "Your layers" panel, and the
+   closet's day/person tags together.
+5. `I'm walking 20 minutes to class at 9am in heavy rain, is my closet actually ready for this kind of weather?`
+   Expected: `plan_day_warmth` → `suggest_wardrobe_gaps`.
+6. `How many clean tops do I have left? Do I need to do laundry soon?`
+   Expected: `plan_laundry`.
+7. `What do I actually wear the most? Is anything in my closet basically untouched?`
+   Expected: `wardrobe_stats`.
 
 ## Tools
 
