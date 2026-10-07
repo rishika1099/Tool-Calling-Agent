@@ -780,48 +780,73 @@ const L3D = {
     base_top: [62, 120, 0, 0], one_piece: [60, 176, 0, 0], hands: [168, 58, 120, -88],
     bottom: [168, 128, 10, 0], legwear: [176, 108, -40, 0], shoes: [286, 82, 24, 0], socks: [280, 60, -34, 0],
 };
-let l3dTurn = { y: -34, x: -6 };
+// Swiping left takes the outermost layer off, in this order; swiping right puts it back.
+// What is left at the end is what you would be wearing indoors with the knit off too.
+const PEEL_ORDER = ["neck", "hands", "head", "outer", "mid_top"];
 
 function layers3d(option, byId) {
     const pieces = option.items.filter((i) => L3D[i.slot] && byId[i.id]?.photo_url);
     if (pieces.length < 2) return "";
     const cards = pieces.sort((a, b) => L3D[a.slot][2] - L3D[b.slot][2]).map((i) => {
         const [top, size, depth, side] = L3D[i.slot];
-        return `<figure class="l3d-piece" data-name="${escapeHtml(i.name)}" data-slot="${escapeHtml(SLOT_LABEL[i.slot] || i.slot)}"
-            style="top:${top}px;width:${size}px;height:${size}px;margin-left:${side - size / 2}px;transform:translateZ(${depth}px)">
+        return `<figure class="l3d-piece" data-name="${escapeHtml(i.name)}" data-slot="${i.slot}"
+            style="top:${top}px;width:${size}px;height:${size}px;margin-left:${side - size / 2}px;--z:${depth}px">
             <img src="${byId[i.id].photo_url}" alt="${escapeHtml(i.name)}" draggable="false"></figure>`;
     }).join("");
-    return `<div class="l3d" aria-label="The outfit's layers in 3D. Drag to turn.">
-        <div class="l3d-stage" style="transform:rotateX(${l3dTurn.x}deg) rotateY(${l3dTurn.y}deg)">${cards}</div>
-        <p class="l3d-hint"><span>Drag to turn the layers</span></p>
+    return `<div class="l3d" aria-label="The outfit's layers in 3D. Swipe left to take a layer off, right to put it back.">
+        <div class="l3d-stage">${cards}</div>
+        <button type="button" class="l3d-nav off" aria-label="Take off a layer">‹</button>
+        <button type="button" class="l3d-nav on" aria-label="Put a layer back">›</button>
+        <p class="l3d-hint"><span></span></p>
     </div>`;
 }
 
 function attachTurn(box) {
     if (!box) return;
     const stage = box.querySelector(".l3d-stage"), hint = box.querySelector(".l3d-hint span");
-    const idle = hint.textContent;
-    let from = null;
-    const apply = () => { stage.style.transform = `rotateX(${l3dTurn.x}deg) rotateY(${l3dTurn.y}deg)`; };
+    // The pieces that can come off, outermost first.
+    const piecesIn = (slotName) => [...box.querySelectorAll(`.l3d-piece[data-slot="${slotName}"]`)];
+    const peelable = PEEL_ORDER.flatMap(piecesIn);
+    // Shoes and trousers only come off when there is something underneath to show.
+    if (piecesIn("socks").length) peelable.push(...piecesIn("shoes"));
+    if (piecesIn("legwear").length) peelable.push(...piecesIn("bottom"));
+    let off = 0, startX = null, dx = 0;
+
+    const show = () => {
+        peelable.forEach((piece, n) => piece.classList.toggle("off", n < off));
+        box.querySelector(".l3d-nav.off").disabled = off >= peelable.length;
+        box.querySelector(".l3d-nav.on").disabled = off === 0;
+        // Turn a little further with each layer off, so the ones underneath come into view.
+        stage.style.transform = `rotateX(-6deg) rotateY(${-34 + off * 9}deg)`;
+        hint.textContent = !peelable.length ? "All one layer"
+            : off === 0 ? "Swipe left to take off a layer"
+            : `Off: ${peelable.slice(0, off).map((p) => p.dataset.name).join(", ")}`;
+    };
+    const peel = (step) => { off = Math.max(0, Math.min(peelable.length, off + step)); show(); };
+
     box.addEventListener("pointerdown", (e) => {
-        if (e.button) return;
-        from = { px: e.clientX, py: e.clientY, y: l3dTurn.y, x: l3dTurn.x };
+        if (e.button || e.target.closest(".l3d-nav")) return;
+        startX = e.clientX; dx = 0;
         box.setPointerCapture?.(e.pointerId);
-        box.classList.add("turning");
     });
     box.addEventListener("pointermove", (e) => {
-        if (!from) return;
-        l3dTurn.y = Math.max(-85, Math.min(85, from.y + (e.clientX - from.px) * 0.55));
-        l3dTurn.x = Math.max(-24, Math.min(24, from.x - (e.clientY - from.py) * 0.25));
-        apply();
+        if (startX === null) return;
+        dx = e.clientX - startX;
+        // The stage leans with the finger so the swipe feels connected.
+        stage.style.transform = `rotateX(-6deg) rotateY(${-34 + off * 9 + Math.max(-40, Math.min(40, dx)) * 0.35}deg)`;
+        box.classList.add("turning");
     });
-    const stop = () => { from = null; box.classList.remove("turning"); };
+    const stop = () => {
+        if (startX === null) return;
+        startX = null;
+        box.classList.remove("turning");
+        if (Math.abs(dx) >= SWIPE_PX) peel(dx < 0 ? 1 : -1); else show();
+    };
     box.addEventListener("pointerup", stop);
     box.addEventListener("pointercancel", stop);
-    box.querySelectorAll(".l3d-piece").forEach((piece) => {
-        piece.addEventListener("pointerenter", () => { hint.textContent = `${piece.dataset.name} · ${piece.dataset.slot}`; });
-        piece.addEventListener("pointerleave", () => { hint.textContent = idle; });
-    });
+    box.querySelector(".l3d-nav.off").addEventListener("click", () => peel(1));
+    box.querySelector(".l3d-nav.on").addEventListener("click", () => peel(-1));
+    show();
 }
 
 function dayLabel(day) {
