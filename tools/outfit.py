@@ -145,12 +145,14 @@ def build_outfit(session, occasion: str = "class", must_include: list[str] | Non
     (and, once laundered, each needs their own wash, not a pass straight to someone else).
     This only applies to garments worn directly against skin (tops, bottoms, dresses, legwear,
     socks) for hygiene; outerwear, mid-layers, shoes and accessories stay available to everyone
-    regardless of who currently has them on. for_whom also steers this pick away from whatever
-    top/bottom/dress/legwear/socks was most recently picked for a *different* for_whom this
-    session, so two people asked about in the same answer don't both get offered the identical
-    physical garment before either has actually claimed anything with update_wardrobe; this is a
-    soft preference, not a hard rule, and backs off automatically if honoring it would leave no
-    outfit at all. Omit for a single user; nothing changes for that case.
+    across different people and days without needing a wash in between - but NOT simultaneously:
+    a single pair of boots is still one physical object, so for_whom also steers this pick away
+    from every item (every slot, not just the hygiene-sensitive ones) most recently picked for a
+    *different* for_whom this session, so two people asked about in the same answer don't both get
+    offered the identical physical item - coat or shoes included - before either has actually
+    claimed anything with update_wardrobe. This is a soft preference, not a hard rule, and backs
+    off automatically if honoring it would leave no outfit at all. Omit for a single user; nothing
+    changes for that case.
     """
     plan = session.last_plan
     if not plan:
@@ -220,7 +222,7 @@ def build_outfit(session, occasion: str = "class", must_include: list[str] | Non
 
     session.last_outfit = [i["id"] for i in options[0]["items"]]
     if for_whom:
-        session.recent_picks[for_whom] = [i["id"] for i in options[0]["items"] if i["slot"] in HYGIENE_SLOTS]
+        session.recent_picks[for_whom] = [i["id"] for i in options[0]["items"]]
     return json.dumps({
         "date": plan.get("date"),
         "for_whom": for_whom or "me",
@@ -346,8 +348,9 @@ TOOLS = [
                 "and adds gloves/hat/scarf if needed. Returns up to 3 ranked options. "
                 "Always call plan_day_warmth first. For a shared closet, pass for_whom: a top, bottom, dress, "
                 "legwear or sock someone else already has on is left out, and this call also automatically "
-                "steers away from whatever skin-touching items a different for_whom was most recently picked "
-                "for this session, even before anything is confirmed with update_wardrobe."
+                "steers away from every item (any slot, including coats and shoes - a single pair of boots "
+                "can't be on two people on the same day) a different for_whom was most recently picked for "
+                "this session, even before anything is confirmed with update_wardrobe."
             ),
             "parameters": {
                 "type": "object",

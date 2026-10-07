@@ -258,18 +258,20 @@ def test_build_outfit_for_whom_still_offers_outerwear_and_shoes_someone_else_has
     assert for_other["claimed_by_someone_else"] == []
 
 
-def test_build_outfit_steers_a_different_for_whom_away_from_the_same_hygiene_items():
+def test_build_outfit_steers_a_different_for_whom_away_from_the_same_items():
     # Asked about two people in the same reply, before either has actually claimed anything with
     # update_wardrobe: the second person's build_outfit call should automatically avoid repeating
-    # the first person's exact top/bottom/socks, without the model needing to pass exclude itself.
+    # the first person's exact picks - every slot, not just hygiene ones. Reported: both people
+    # got offered the same single pair of boots for the same day, which is physically impossible
+    # regardless of whether shoes need a hygiene wash between wearers.
     _, session = get_session(None)
     session.last_plan = SHARED_PLAN
     me = json.loads(run_tool("build_outfit", {"for_whom": "me"}, session))
-    me_hygiene = {i["id"] for i in me["options"][0]["items"] if i["slot"] in ("base_top", "bottom", "socks")}
+    me_ids = {i["id"] for i in me["options"][0]["items"]}
 
     alex = json.loads(run_tool("build_outfit", {"for_whom": "Alex"}, session))
-    alex_hygiene = {i["id"] for i in alex["options"][0]["items"] if i["slot"] in ("base_top", "bottom", "socks")}
-    assert not (me_hygiene & alex_hygiene)  # no shared top/bottom/socks between the two picks
+    alex_ids = {i["id"] for i in alex["options"][0]["items"]}
+    assert not (me_ids & alex_ids)  # no shared item at all between the two same-session picks
 
 
 def test_build_outfit_overlap_avoidance_backs_off_when_nothing_else_is_available():
