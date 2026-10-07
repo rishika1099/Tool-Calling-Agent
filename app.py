@@ -3,7 +3,9 @@ import json
 import re
 import secrets
 import uuid
+from datetime import datetime
 from pathlib import Path
+from zoneinfo import ZoneInfo
 
 import litellm
 import uvicorn
@@ -24,10 +26,22 @@ from tools.forecast import current_conditions
 
 MAX_TOOL_ROUNDS = 8
 MAX_UPLOAD_BYTES = 8 * 1024 * 1024
+NY_TZ = ZoneInfo("America/New_York")  # the app's default city; anchors "today" for the system prompt
 
-SYSTEM_PROMPT = """You are Layer Lab, a getting-dressed assistant for students facing cold NYC weather.
+
+def system_prompt() -> str:
+    """Built fresh per session so the model always starts from the real current date.
+
+    Without this the model only learns "today" by reading a prior plan_day_warmth result,
+    which gets harder to find the longer a conversation runs, and it has no way at all to
+    resolve something like "day after tomorrow" or "this Friday" before ever calling a tool.
+    """
+    today = datetime.now(NY_TZ)
+    return f"""You are Layer Lab, a getting-dressed assistant for students facing cold NYC weather.
 You decide what to wear from the user's own closet, based on the forecast for the hours they are
 actually outside, whether they will be indoors or outdoors, and how quickly they feel cold.
+
+Today is {today.strftime("%A, %Y-%m-%d")} in New York.
 
 How to work:
 - For any "what should I wear" question: call plan_day_warmth with the user's day broken into
@@ -35,11 +49,17 @@ How to work:
   then call build_outfit. Never guess warmth numbers yourself.
 - If the user doesn't give times, assume a typical class day and say what you assumed.
   Default location is New York and default day is today.
+- Work out any relative or named day ("day after tomorrow", "this Friday", "in 3 days") yourself
+  from today's date above, and pass plan_day_warmth an exact YYYY-MM-DD for anything beyond the
+  literal words "today" or "tomorrow". Say the date you used (e.g. "For Thursday, Oct 9") whenever
+  the day isn't literally "today", so it's unambiguous which day you mean.
 - If the user says they run cold or warm, call set_cold_sensitivity, then re-plan.
 - If they report how a past outfit felt ("I was freezing yesterday"), call record_comfort_feedback.
-- If they say an item is in the wash, call update_wardrobe with 'in_laundry'. Once they confirm they're
-  wearing an outfit, call update_wardrobe with 'worn' for those items; items that hit their wear limit
-  go to the laundry automatically, so mention that if the tool result's 'note' says so.
+- If they say an item is in the wash, call update_wardrobe with 'in_laundry'. Once they settle on an
+  outfit for a day, whether they confirm it directly or just move on to asking about another day,
+  call update_wardrobe with 'worn' for those items so laundry status carries forward correctly;
+  items that hit their wear limit go to the laundry automatically, so mention that if the tool
+  result's 'note' says so.
 - Photo ids like img_ab12cd in a message are uploaded photos. Clothing photos go to scan_garment.
 - When the user asks to see an outfit on themselves, call try_on_outfit. It uses the photo saved in
   "Your photo"; pass person_photo_id only if they attached a new photo of themselves in that message.
@@ -51,6 +71,9 @@ How to work:
 How to answer:
 - Recommend the first option from build_outfit: it is ranked best and the page shows it as option 1.
   Name every item in it. Mention option 2 or 3 only if the user asks for alternatives, by number.
+  The side panel only ever shows the most recently built outfit: if you discuss more than one day
+  in the same answer, give the full outfit for each one instead of a bare option number, since a
+  number from an earlier day in the same answer won't match what the panel is showing.
 - Lead with the outfit in one line, then 2-4 short bullets: why it's warm enough, what to take off
   indoors, and any rain/wind warnings. Mention clo only briefly (e.g. "about 1.8 clo").
 - Refer to clothes by name, not id. Use plain punctuation: commas and periods, no em dashes.
@@ -118,7 +141,7 @@ sessions: dict[str, Session] = {}
 def get_session(session_id: str | None) -> tuple[str, Session]:
     session_id = session_id or str(uuid.uuid4())
     if session_id not in sessions:
-        sessions[session_id] = Session.new(SYSTEM_PROMPT, session_id)
+        sessions[session_id] = Session.new(system_prompt(), session_id)
     return session_id, sessions[session_id]
 
 
