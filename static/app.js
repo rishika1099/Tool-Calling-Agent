@@ -745,6 +745,7 @@ function renderOptionDetail(entry, section, animate) {
 
     const detail = section.querySelector(".option-detail");
     detail.innerHTML = `
+        ${layers3d(option, byId)}
         <div class="fit-grid">
             <div>
                 <div class="stack">${layers}</div>
@@ -758,6 +759,8 @@ function renderOptionDetail(entry, section, animate) {
         ${option.take_off_indoors.length ? `<p class="takeoff">Take off indoors: <b>${option.take_off_indoors.map(escapeHtml).join(", ")}</b></p>` : ""}
         ${option.notes.length ? `<ul class="notes">${option.notes.map((n) => `<li>${escapeHtml(n)}</li>`).join("")}</ul>` : ""}`;
 
+    attachTurn(detail.querySelector(".l3d"));
+
     if (animate && A) {
         // Get dressed from the inside out: base layer first, coat last.
         safeAnimate(detail.querySelectorAll(".layer"), { opacity: { from: 0 }, translateY: { from: -18 }, scaleX: { from: 0.92 },
@@ -766,6 +769,59 @@ function renderOptionDetail(entry, section, animate) {
         detail.querySelectorAll(".num").forEach(countUp);
         enter(detail.querySelectorAll(".extras span, .takeoff, .notes li"), { delay: 50, y: 8 });
     }
+}
+
+// ---------- The outfit in 3D: each piece floats at its own depth, skin to coat ----------
+
+// Where a slot sits on the figure: [top px, size px, depth px, sideways px]. Depth is what the
+// drag reveals: base layers at the back, coat and scarf at the front.
+const L3D = {
+    head: [0, 62, 40, 0], neck: [44, 66, 170, 62], outer: [50, 150, 120, 0], mid_top: [56, 134, 60, 0],
+    base_top: [62, 120, 0, 0], one_piece: [60, 176, 0, 0], hands: [168, 58, 120, -88],
+    bottom: [168, 128, 10, 0], legwear: [176, 108, -40, 0], shoes: [286, 82, 24, 0], socks: [280, 60, -34, 0],
+};
+let l3dTurn = { y: -34, x: -6 };
+
+function layers3d(option, byId) {
+    const pieces = option.items.filter((i) => L3D[i.slot] && byId[i.id]?.photo_url);
+    if (pieces.length < 2) return "";
+    const cards = pieces.sort((a, b) => L3D[a.slot][2] - L3D[b.slot][2]).map((i) => {
+        const [top, size, depth, side] = L3D[i.slot];
+        return `<figure class="l3d-piece" data-name="${escapeHtml(i.name)}" data-slot="${escapeHtml(SLOT_LABEL[i.slot] || i.slot)}"
+            style="top:${top}px;width:${size}px;height:${size}px;margin-left:${side - size / 2}px;transform:translateZ(${depth}px)">
+            <img src="${byId[i.id].photo_url}" alt="${escapeHtml(i.name)}" draggable="false"></figure>`;
+    }).join("");
+    return `<div class="l3d" aria-label="The outfit's layers in 3D. Drag to turn.">
+        <div class="l3d-stage" style="transform:rotateX(${l3dTurn.x}deg) rotateY(${l3dTurn.y}deg)">${cards}</div>
+        <p class="l3d-hint"><span>Drag to turn the layers</span></p>
+    </div>`;
+}
+
+function attachTurn(box) {
+    if (!box) return;
+    const stage = box.querySelector(".l3d-stage"), hint = box.querySelector(".l3d-hint span");
+    const idle = hint.textContent;
+    let from = null;
+    const apply = () => { stage.style.transform = `rotateX(${l3dTurn.x}deg) rotateY(${l3dTurn.y}deg)`; };
+    box.addEventListener("pointerdown", (e) => {
+        if (e.button) return;
+        from = { px: e.clientX, py: e.clientY, y: l3dTurn.y, x: l3dTurn.x };
+        box.setPointerCapture?.(e.pointerId);
+        box.classList.add("turning");
+    });
+    box.addEventListener("pointermove", (e) => {
+        if (!from) return;
+        l3dTurn.y = Math.max(-85, Math.min(85, from.y + (e.clientX - from.px) * 0.55));
+        l3dTurn.x = Math.max(-24, Math.min(24, from.x - (e.clientY - from.py) * 0.25));
+        apply();
+    });
+    const stop = () => { from = null; box.classList.remove("turning"); };
+    box.addEventListener("pointerup", stop);
+    box.addEventListener("pointercancel", stop);
+    box.querySelectorAll(".l3d-piece").forEach((piece) => {
+        piece.addEventListener("pointerenter", () => { hint.textContent = `${piece.dataset.name} · ${piece.dataset.slot}`; });
+        piece.addEventListener("pointerleave", () => { hint.textContent = idle; });
+    });
 }
 
 function dayLabel(day) {

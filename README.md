@@ -37,7 +37,7 @@ IEOR 4570 Project 1. Team: Rishika, Shreya, Kshamaa.
 
 ## Sample queries
 
-A demo closet of 41 pieces is loaded in every new session, so all seven of these work without
+A demo closet of 56 pieces is loaded in every new session, so all seven of these work without
 uploading anything. Each piece has an AI-generated product-style photo (an illustration of the
 demo data, not a real product), and the closet is grouped into sections: tops, knits and layers,
 coats and jackets, bottoms, dresses, shoes, extras. The expected tool calls under each query are

@@ -174,7 +174,7 @@ def test_closet_setup_starts_empty_and_borrows_missing_basics():
     assert borrowed == ["White cotton tee", "Black down parka", "Brown leather boots"]  # jeans cover "bottom"
     state = client.get(f"/wardrobe?session_id={sid}").json()
     assert state["setup_done"] is True and len(state["items"]) == 4
-    assert client.post("/wardrobe/start", json={"session_id": sid, "mode": "demo"}).json()["items"] == 41
+    assert client.post("/wardrobe/start", json={"session_id": sid, "mode": "demo"}).json()["items"] == 56
     assert client.post("/wardrobe/start", json={"session_id": sid, "mode": "nope"}).status_code == 400
 
 
@@ -190,7 +190,7 @@ def test_demo_closet_photos_exist_and_are_served():
     client = TestClient(app_module.app)
     items = client.get("/wardrobe").json()["items"]
     with_photo = [i for i in items if i["photo_url"]]
-    assert len(with_photo) == len(items) == 41  # every demo piece has a photo
+    assert len(with_photo) == len(items) == 56  # every demo piece has a photo
     for item in with_photo:
         assert item["photo_url"].startswith("/static/closet/")
         assert (app_module.STATIC / item["photo_url"].removeprefix("/static/").split("?")[0]).is_file(), item["id"]
