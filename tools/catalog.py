@@ -34,12 +34,17 @@ def load_demo_wardrobe() -> list[dict]:
         return json.load(f)
 
 
+# Parsed once: these two are looked up millions of times when ranking outfits.
+_SLOT = {name: row["slot"] for name, row in GARMENTS.items()}
+_CLO = {name: float(row["clo"]) for name, row in GARMENTS.items()}
+
+
 def slot(item: dict) -> str:
-    return GARMENTS[item["garment_type"]]["slot"]
+    return _SLOT[item["garment_type"]]
 
 
 def clo(item: dict) -> float:
-    return float(GARMENTS[item["garment_type"]]["clo"])
+    return _CLO[item["garment_type"]]
 
 
 def wear_limit(item: dict) -> int:

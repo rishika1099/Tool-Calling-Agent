@@ -12,6 +12,9 @@ from . import style
 from .catalog import INDOOR_SLOTS, clo, is_windproof, keeps_rain_out, slot, wear_limit, wet_retention
 
 UNDERWEAR_CLO = 0.04  # assumed, not tracked in the closet
+BARE_LEG_TYPES = {"skirt_thin", "skirt_thick", "dress_thin", "dress_thick", "shorts"}
+COLD_DAY_CLO = 0.7  # outdoor warmth needed above which the warm socks go on
+STYLE_WEIGHT = 0.25  # penalty per style point lost (out of 10)
 SHORT_JACKETS = {"denim_jacket", "bomber_jacket", "leather_jacket"}
 OCCASIONS = {"everyday": 1, "class": 1, "date": 2, "dinner": 2, "party": 2, "work": 2, "interview": 3}  # minimum formality
 WINDY_MPH = 12
@@ -60,11 +63,12 @@ def _outermost(outfit: list[dict]) -> dict:
     return outfit[0]
 
 
-def _evaluate(outfit: list[dict], summary: dict, occasion: str) -> dict:
+def _evaluate(outfit: list[dict], summary: dict, occasion: str, with_style: bool = True) -> dict:
     """Indoor and outdoor warmth of an outfit against the plan, with a penalty (lower is better)."""
     notes = []
-    indoor = UNDERWEAR_CLO + sum(clo(i) for i in outfit if slot(i) in INDOOR_SLOTS)
-    outer = next((i for i in outfit if slot(i) == "outer"), None)
+    slots = [slot(i) for i in outfit]
+    indoor = UNDERWEAR_CLO + sum(clo(i) for i, s in zip(outfit, slots) if s in INDOOR_SLOTS)
+    outer = outfit[slots.index("outer")] if "outer" in slots else None
     outdoor = indoor + (clo(outer) if outer else 0.0)
     penalty = 0.0
 
@@ -91,24 +95,42 @@ def _evaluate(outfit: list[dict], summary: dict, occasion: str) -> dict:
         penalty += 3 * max(0.0, summary["indoor_clo_min"] - indoor)
         penalty += 2 * max(0.0, indoor - summary["indoor_clo_ideal"] - 0.25)
 
-    penalty += LAYER_COST * sum(1 for i in outfit if slot(i) in ("mid_top", "outer", "legwear"))
+    penalty += LAYER_COST * sum(1 for s in slots if s in ("mid_top", "outer", "legwear"))
+
+    # Bare legs under a short skirt or a dress on a cold day: allowed, but tights should win.
+    if (summary.get("outdoor_clo_min") or 0) >= COLD_DAY_CLO and "legwear" not in slots:
+        if any(i["garment_type"] in BARE_LEG_TYPES for i in outfit):
+            penalty += 0.5
+            notes.append("bare legs on a cold day: add tights")
 
     # Formality of what stays on indoors; each level below the occasion costs a little.
-    visible = [i for i in outfit if slot(i) in ("base_top", "bottom", "one_piece", "mid_top")]
-    penalty += 0.6 * sum(max(0, OCCASIONS[occasion] - i.get("formality", 1)) for i in visible)
-    # Shoes are seen all day and the coat on the way in, so they count too, at half weight.
-    seen = [i for i in outfit if slot(i) in ("shoes", "outer")]
-    penalty += 0.3 * sum(max(0, OCCASIONS[occasion] - i.get("formality", 1)) for i in seen)
+    need = OCCASIONS[occasion]
+    if need > 1:  # everything is at least formality 1, so casual occasions cost nothing here
+        penalty += 0.6 * sum(max(0, need - i.get("formality", 1)) for i, s in zip(outfit, slots)
+                             if s in ("base_top", "bottom", "one_piece", "mid_top"))
+        # Shoes are seen all day and the coat on the way in, so they count too, at half weight.
+        penalty += 0.3 * sum(max(0, need - i.get("formality", 1)) for i, s in zip(outfit, slots)
+                             if s in ("shoes", "outer"))
 
     # Sweatpants and hoodies are for days with nothing on; anywhere else they are a last resort.
     if occasion != "everyday":
         penalty += 0.4 * sum(1 for i in outfit if i["garment_type"] in style.LOUNGE)
 
-    style_result = style.style_score(outfit, occasion)
-    if style_result is not None:
-        penalty += (10 - style_result["score"]) * 0.15
+    result = {"indoor": indoor, "outdoor": outdoor, "notes": notes, "penalty": penalty, "style": None}
+    return _add_style(result, outfit, occasion) if with_style else result
 
-    return {"indoor": indoor, "outdoor": outdoor, "notes": notes, "penalty": penalty, "style": style_result}
+
+def _add_style(result: dict, outfit: list[dict], occasion: str) -> dict:
+    """Add the style score to an evaluated outfit. It only ever raises the penalty."""
+    result["style"] = style.style_score(outfit, occasion)
+    if result["style"] is not None:
+        result["penalty"] += (10 - result["style"]["score"]) * STYLE_WEIGHT
+    return result
+
+
+def _look(outfit: list[dict]) -> tuple:
+    """What makes two options look different: the top and bottom (or the dress)."""
+    return tuple(sorted(i["id"] for i in outfit if slot(i) in ("base_top", "bottom", "one_piece")))
 
 
 def _add_accessories(result: dict, accessories: list[dict], target: float | None) -> list[dict]:
@@ -202,11 +224,29 @@ def build_outfit(session, occasion: str = "class", must_include: list[str] | Non
                      if i["status"] != "in_laundry" and i["id"] not in avoid and not _claimed_by_someone_else(i)]
         wearable = [i for i in available if slot(i) not in ("head", "hands", "neck")]
         accessories = [i for i in available if slot(i) in ("head", "hands", "neck")]
-        scored = []
-        for outfit in _combos(wearable):
-            ids = {i["id"] for i in outfit}
-            if all(m in ids for m in must_include if slot(session.wardrobe[m]) not in ("head", "hands", "neck")):
-                scored.append((_evaluate(outfit, summary, occasion), outfit))
+        needed = {m for m in must_include if slot(session.wardrobe[m]) not in ("head", "hands", "neck")}
+        # Socks barely change the numbers (0.03 against 0.06 clo), so pick the pair up front
+        # rather than trying every outfit with each: the warmest on a cold day, else the lightest.
+        socks = [i for i in wearable if slot(i) == "socks"]
+        if len(socks) > 1:
+            asked = [i for i in socks if i["id"] in needed]
+            cold = (summary.get("outdoor_clo_min") or 0) >= COLD_DAY_CLO
+            pair = asked[0] if asked else (max if cold else min)(socks, key=clo)
+            wearable = [i for i in wearable if slot(i) != "socks"] + [pair]
+        # Warmth, rain and formality are quick to work out; the style score is not. So rank on the
+        # quick part first, then add style from the best down. Style only ever adds penalty, so once
+        # three different looks beat the next outfit's quick penalty, nothing further can catch up.
+        rough = [(_evaluate(outfit, summary, occasion, with_style=False), outfit) for outfit in _combos(wearable)
+                 if needed <= {i["id"] for i in outfit}]
+        rough.sort(key=lambda pair: pair[0]["penalty"])
+        scored, best = [], {}
+        for result, outfit in rough:
+            if len(best) >= 3 and result["penalty"] > sorted(best.values())[2]:
+                break
+            _add_style(result, outfit, occasion)
+            scored.append((result, outfit))
+            look = _look(outfit)
+            best[look] = min(best.get(look, result["penalty"]), result["penalty"])
         return scored, accessories
 
     scored, accessories = _score(recent_elsewhere)
@@ -221,7 +261,7 @@ def build_outfit(session, occasion: str = "class", must_include: list[str] | Non
 
     options, seen = [], set()
     for result, outfit in scored:
-        key = tuple(sorted(i["id"] for i in outfit if slot(i) in ("base_top", "bottom", "one_piece", "outer")))
+        key = _look(outfit)  # three options that differ in more than the coat
         if key in seen:
             continue
         seen.add(key)

@@ -227,11 +227,19 @@ def test_build_outfit_uses_the_style_score(cool_day):
 
 
 def test_scoring_every_candidate_outfit_is_fast():
+    # The demo closet makes a few hundred thousand combinations, so build_outfit ranks them on
+    # warmth first and only style-scores the contenders. Both parts have to stay quick.
     _, session = get_session(None)
     combos = list(outfit._combos([i for i in session.wardrobe.values() if outfit.slot(i) not in ("head", "hands", "neck")]))
     assert len(combos) > 1000
     style._score.cache_clear()
     start = time.perf_counter()
-    for combo in combos:
+    for combo in combos[:20000]:
         style_score(combo, "class")
     assert time.perf_counter() - start < 2.0  # about 0.3 s on a laptop; generous for slow CI
+
+    session.last_plan = {"summary": {"outdoor_clo_min": 1.05, "outdoor_clo_ideal": 1.42, "indoor_clo_min": 0.83,
+                                     "indoor_clo_ideal": 1.17, "max_wind_mph": 7}}
+    start = time.perf_counter()
+    assert "options" in json.loads(run_tool("build_outfit", {"occasion": "class"}, session))
+    assert time.perf_counter() - start < 6.0  # about 1 s on a laptop

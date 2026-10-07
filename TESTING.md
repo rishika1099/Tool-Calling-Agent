@@ -78,7 +78,7 @@ Do these on the live URL. Each takes a few minutes.
 
 ## Known limits (say so if asked)
 
-- `try_on_outfit` makes an AI preview in about 15 seconds. Colors and fit are approximate, and the model may invent details (a fur hood, a different hem). Garments are shown from their photos: your uploads, and the demo closet's 41 AI-generated product photos.
+- `try_on_outfit` makes an AI preview in about 15 seconds. Colors and fit are approximate, and the model may invent details (a fur hood, a different hem). Garments are shown from their photos: your uploads, and the demo closet's 56 AI-generated product photos.
 - Sessions live in the server's memory. If nobody uses the app for a while, Cloud Run stops it and sessions reset.
 - One instance only, by design (in-memory sessions).
 - Garment type from a photo is a model judgment; the form lets the user correct it. Fibers from a care label are reliable.
