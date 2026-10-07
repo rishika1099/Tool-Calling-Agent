@@ -498,9 +498,12 @@ body.in-setup #composer { display: none; }
 }
 [data-theme="dark"] .msg.user { color: #0b1424; }
 .msg.assistant { align-self: flex-start; font-size: 15.5px; }
-.msg.assistant .content p + p, .msg.assistant .content ul { margin-top: 10px; }
+.msg.assistant .content p + p, .msg.assistant .content ul, .msg.assistant .content h4 { margin-top: 10px; }
 .msg.assistant .content ul { padding-left: 18px; }
+.msg.assistant .content ul ul { margin-top: 4px; padding-left: 16px; }
 .msg.assistant .content li + li { margin-top: 4px; }
+.msg.assistant .content h4 { font: 600 1em/1.3 var(--text); color: var(--ink); }
+.msg.assistant .content hr { border: 0; border-top: 1px solid var(--line); margin: 12px 0; }
 .msg .w { display: inline-block; white-space: pre; }
 .msg img.thumb { width: 64px; height: 64px; object-fit: cover; border-radius: 10px; margin: 8px 6px 0 0; }
 

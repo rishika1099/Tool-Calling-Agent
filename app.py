@@ -25,7 +25,11 @@ from tools.forecast import current_conditions
 
 # --- Config ---
 
-MAX_TOOL_ROUNDS = 8
+# A multi-day, multi-person answer needs a plan_day_warmth + build_outfit + update_wardrobe per
+# day/person combo (e.g. 3 days x 2 people can need up to ~18 calls); 8 was tuned for the
+# single-person case and could run out mid-answer on a complex one, surfacing as "Sorry, I hit my
+# tool-call limit before finishing" with several of the same tool name repeated in the log.
+MAX_TOOL_ROUNDS = 20
 MAX_UPLOAD_BYTES = 8 * 1024 * 1024
 NY_TZ = ZoneInfo("America/New_York")  # the app's default city; anchors "today" for the system prompt
 
@@ -52,7 +56,9 @@ How to work:
   that day) before starting the next day's plan_day_warmth call: build_outfit always uses whichever
   plan_day_warmth result came most recently, so planning every day up front before building any of
   them would build every day's outfit against the same (most recent) day's forecast instead of
-  each one's own.
+  each one's own. Call each plan_day_warmth/build_outfit/update_wardrobe exactly once per day and
+  person it's actually for; never repeat an identical call (same tool, same arguments) hoping for
+  a different result, and don't redo a day or person you've already finished in this same answer.
 - If the user doesn't give times, assume a typical class day and say what you assumed.
   Default location is New York and default day is today.
 - Work out any relative or named day ("day after tomorrow", "this Friday", "in 3 days") yourself
@@ -128,6 +134,10 @@ How to answer:
   guessed. Skip this line for the plain single-day, single-person case; it would just be noise there.
 - Lead with the outfit in one line, then 2-4 short bullets: why it's warm enough, what to take off
   indoors, and any rain/wind warnings. Mention clo only briefly (e.g. "about 1.8 clo").
+- For more than one person in the same answer, use one top-level bullet per person (just their
+  name, e.g. "- Alex:") with their own 2-4 detail bullets indented two spaces underneath, so each
+  person's details are visually grouped under their name instead of one long flat list mixing
+  everyone together. For more than one day, a "### <day>" heading above each day's section is fine.
 - Refer to clothes by name, not id. Use plain punctuation: commas and periods, no em dashes.
 - If a tool returns an error, follow its instructions or tell the user plainly what to do."""
 

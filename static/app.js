@@ -55,21 +55,60 @@ function escapeHtml(text) {
 }
 
 // Just enough markdown for the model's answers: paragraphs, bullet lists, **bold**.
+// Headings (#..######), horizontal rules (---), and up to one level of nested bullets (2+ spaces
+// of indent), on top of the original flat-bullet/paragraph/bold support. A multi-day or
+// multi-person answer naturally wants "Person: intro" as a top-level bullet with that person's
+// own details indented under it, and the model's own section headers (e.g. "### Today") need
+// somewhere to go other than literal "###" text in the middle of a chat bubble.
 function renderMarkdown(text) {
+    const inline = (s) => escapeHtml(s).replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>");
     const html = [];
-    let list = null;
+    let topItems = null; // open top-level <li> strings for the current list
+    let subItems = null; // open nested <li> strings for the current top-level item
+
+    const closeSub = () => {
+        if (subItems && topItems && topItems.length) {
+            const nested = `<ul>${subItems.join("")}</ul>`;
+            topItems[topItems.length - 1] = topItems[topItems.length - 1].replace(/<\/li>$/, `${nested}</li>`);
+        }
+        subItems = null;
+    };
+    const closeTop = () => {
+        closeSub();
+        if (topItems) { html.push(`<ul>${topItems.join("")}</ul>`); topItems = null; }
+    };
+
     for (const raw of (text || "").split("\n")) {
-        const line = escapeHtml(raw.trim()).replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>");
-        const bullet = line.match(/^[-*•]\s+(.*)/);
-        if (bullet) {
-            list = list || [];
-            list.push(`<li>${bullet[1]}</li>`);
+        const indent = (raw.match(/^[ \t]*/)[0] || "").replace(/\t/g, "  ").length;
+        const trimmed = raw.trim();
+        const heading = trimmed.match(/^(#{1,6})\s+(.*)/);
+        const bullet = trimmed.match(/^[-*•]\s+(.*)/);
+        const hr = /^(-{3,}|\*{3,}|_{3,})$/.test(trimmed);
+
+        if (heading) {
+            closeTop();
+            // One consistent heading style regardless of #-depth: a chat bubble is too small for
+            // six distinct visual tiers, and the model only ever uses headings as simple section
+            // breaks (e.g. "### Today").
+            html.push(`<h4>${inline(heading[2])}</h4>`);
             continue;
         }
-        if (list) { html.push(`<ul>${list.join("")}</ul>`); list = null; }
-        if (line) html.push(`<p>${line}</p>`);
+        if (hr) { closeTop(); html.push("<hr>"); continue; }
+        if (bullet) {
+            if (indent >= 2 && topItems && topItems.length) {
+                subItems = subItems || [];
+                subItems.push(`<li>${inline(bullet[1])}</li>`);
+            } else {
+                closeSub();
+                topItems = topItems || [];
+                topItems.push(`<li>${inline(bullet[1])}</li>`);
+            }
+            continue;
+        }
+        closeTop();
+        if (trimmed) html.push(`<p>${inline(trimmed)}</p>`);
     }
-    if (list) html.push(`<ul>${list.join("")}</ul>`);
+    closeTop();
     return html.join("");
 }
 
