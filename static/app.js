@@ -1166,8 +1166,20 @@ function showPreview(url) {
     if (A) safeAnimate(el, { opacity: { from: 0 }, scale: { from: 0.94 }, duration: 800, ease: "outExpo" });
 }
 
+// "See it on me" always means the primary user's own saved photo, so it should default to the
+// primary user's own earliest-day outfit - not focusedEntryKey, which tracks whichever carousel
+// card was clicked or build_outfit call landed last (could be a different day or a different
+// person entirely in a multi-day/multi-person turn, which looked like random picking).
+function meTryEntry() {
+    const entries = [...outfitEntries.values()];
+    if (!entries.length) return null;
+    const mine = entries.filter((e) => (e.forWhom || "me").toLowerCase() === "me");
+    const pool = mine.length ? mine : entries;
+    return pool.slice().sort((a, b) => a.day.localeCompare(b.day))[0];
+}
+
 $("#me-try").addEventListener("click", () => {
-    const entry = outfitEntries.get(focusedEntryKey) || [...outfitEntries.values()][0];
+    const entry = meTryEntry();
     if (!entry) return;
     const n = entry.optionIndex + 1;
     const base = entry.outfit.options.length > 1 ? `Show me wearing option ${n}` : "Show me wearing this outfit";
