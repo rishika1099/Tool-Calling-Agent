@@ -849,6 +849,9 @@ body.in-setup #composer { display: none; }
    (purple). Real chips, not a ribbon: up to two can coexist, which a single ::after corner
    can't do cleanly. */
 .item-tags { position: absolute; top: 6px; left: 6px; right: 6px; display: flex; flex-wrap: wrap; gap: 3px; z-index: 1; }
+/* The laundry-undo circle sits in that same top-left corner on a multi-unit item that also has
+   a tag: give the tags room so the two don't overlap. */
+.item-cell:has(.laundry-undo) .item-tags { left: 30px; }
 .tag {
     font: 600 8px/1.4 var(--mono);
     text-transform: uppercase;
