@@ -75,10 +75,21 @@ def test_update_wardrobe_sets_and_clears_worn_by():
     assert session.wardrobe["jeans-indigo"]["worn_by"] is None
 
 
-def test_worn_by_does_not_stick_to_an_item_that_hits_its_wear_limit():
-    # tee-white's wear limit is 1, so this call sends it straight to the laundry; nobody
-    # "has" a laundered item, so worn_by should not be left set.
+def test_worn_by_still_tags_an_item_on_the_call_that_reaches_its_wear_limit():
+    # tee-white's wear limit is 1, so this call sends it straight to the laundry - but Alex is
+    # wearing it *right now*, today, even though it also needs a wash after, so the tag should
+    # still show who has it instead of silently vanishing the moment it's marked worn.
     _, session = get_session(None)
+    run_tool("update_wardrobe", {"item_ids": ["tee-white"], "status": "worn", "worn_by": "Alex"}, session)
+    assert session.wardrobe["tee-white"]["status"] == "in_laundry"
+    assert session.wardrobe["tee-white"]["worn_by"] == "Alex"
+
+
+def test_worn_by_does_not_stick_to_an_item_already_fully_in_the_laundry():
+    # A second "worn" call on an item that was already at its wear limit (no clean units left)
+    # isn't "being worn right now" in any meaningful sense - nobody picked up a dirty item.
+    _, session = get_session(None)
+    run_tool("update_wardrobe", {"item_ids": ["tee-white"], "status": "worn", "worn_by": "Alex"}, session)
     run_tool("update_wardrobe", {"item_ids": ["tee-white"], "status": "worn", "worn_by": "Alex"}, session)
     assert session.wardrobe["tee-white"]["status"] == "in_laundry"
     assert session.wardrobe["tee-white"]["worn_by"] is None
@@ -101,6 +112,16 @@ def test_update_wardrobe_sets_and_clears_worn_for():
     assert result["updated"][0]["worn_for"] == "tomorrow"
     run_tool("update_wardrobe", {"item_ids": ["jeans-indigo"], "status": "clean"}, session)
     assert session.wardrobe["jeans-indigo"]["worn_for"] is None
+
+
+def test_worn_for_also_still_tags_an_item_on_the_call_that_reaches_its_wear_limit():
+    _, session = get_session(None)
+    result = json.loads(run_tool("update_wardrobe",
+                                  {"item_ids": ["tee-white"], "status": "worn", "worn_by": "me", "worn_for": "today"},
+                                  session))
+    assert session.wardrobe["tee-white"]["status"] == "in_laundry"
+    assert session.wardrobe["tee-white"]["worn_for"] == "today"
+    assert result["updated"][0]["worn_for"] == "today"
 
 
 def test_worn_for_does_not_gate_build_outfit_availability():

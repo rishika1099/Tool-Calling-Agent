@@ -275,11 +275,12 @@ def update_wardrobe(session, item_ids: list[str], status: str, worn_by: str | No
     closet shared by more than one person. worn_for optionally labels which day it's set aside for
     (e.g. "today", "tomorrow", or the date used in plan_day_warmth) once more than one day has been
     planned in this conversation, even for a single person. Both only take effect alongside
-    status="worn", and only on items that end up actually staying "worn" (not ones that hit their
-    wear limit and go straight to the laundry). Any other status clears both labels: nobody
-    currently "has" an item, for anyone or any day, once it isn't being worn right now.
-    build_outfit's for_whom filter reads worn_by to avoid handing one person's current pick to
-    someone else before it is laundered.
+    status="worn" - including on an item whose wear limit this exact call reaches (you're still
+    wearing it right now, even though it's also headed to the laundry after); any OTHER status, or
+    a "worn" call on an item that was already at its limit before this call, clears both labels,
+    since nobody currently "has" a plain dirty item that nobody just put on. build_outfit's
+    for_whom filter reads worn_by to avoid handing one person's current pick to someone else
+    before it is laundered.
     """
     if status not in STATUSES:
         return json.dumps({"error": f"status must be one of {STATUSES}."})
@@ -290,11 +291,14 @@ def update_wardrobe(session, item_ids: list[str], status: str, worn_by: str | No
     for item_id in item_ids:
         item = session.wardrobe[item_id]
         qty = item.get("qty", 1)
+        just_worn_out = False  # this exact call dirtied a previously-clean unit, not an already-laundered one
         if status == "worn":
             item["wears"] += 1
             item["lifetime_wears"] = item.get("lifetime_wears", 0) + 1
             if item["wears"] >= wear_limit(item):
-                item["qty_in_laundry"] = min(qty, item.get("qty_in_laundry", 0) + 1)
+                prev_dirty = item.get("qty_in_laundry", 0)
+                item["qty_in_laundry"] = min(qty, prev_dirty + 1)
+                just_worn_out = item["qty_in_laundry"] > prev_dirty
                 needs_laundry.append(item["name"])
         elif status == "clean":
             item["qty_in_laundry"] = 0
@@ -302,11 +306,15 @@ def update_wardrobe(session, item_ids: list[str], status: str, worn_by: str | No
         else:  # "in_laundry": one more unit goes to the wash, same action as a laundry-panel tap
             item["qty_in_laundry"] = min(qty, item.get("qty_in_laundry", 0) + 1)
         sync_laundry_status(item)
-        still_worn = item["status"] == "worn"
+        # Still tag it even if this exact "worn" call is what just sent the last clean unit to the
+        # laundry: the user is wearing it *right now*, today, even though it'll need a wash after -
+        # that's not the same as "nobody has this, it's just sitting dirty" (a bare "in_laundry" call
+        # with no wear behind it, which still clears the tag as before).
+        still_has_it = item["status"] == "worn" or just_worn_out
         item["worn_by"] = worn_by.strip()[:40] if (
-            isinstance(worn_by, str) and worn_by.strip() and still_worn) else None
+            isinstance(worn_by, str) and worn_by.strip() and still_has_it) else None
         item["worn_for"] = worn_for.strip()[:40] if (
-            isinstance(worn_for, str) and worn_for.strip() and still_worn) else None
+            isinstance(worn_for, str) and worn_for.strip() and still_has_it) else None
         updated.append({"id": item_id, "name": item["name"], "status": item["status"], "wears": item["wears"],
                          "worn_by": item["worn_by"], "worn_for": item["worn_for"],
                          "qty": qty, "qty_in_laundry": item["qty_in_laundry"]})
