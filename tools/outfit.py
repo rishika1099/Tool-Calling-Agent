@@ -20,6 +20,8 @@ TIGHTS = {"tights", "fleece_tights"}
 ACCESSORY_ORDER = ["gloves", "beanie", "scarf"]
 LAYER_COST = 0.08  # small cost per optional layer, so we never add layers that don't help
 STATUSES = ["clean", "worn", "in_laundry"]
+# Worn against skin: not shared between people in a closet until laundered, unlike outer/shoes/accessories.
+HYGIENE_SLOTS = {"base_top", "bottom", "one_piece", "legwear", "socks"}
 
 
 def _by_slot(items: list[dict]) -> dict[str, list[dict]]:
@@ -137,10 +139,13 @@ def build_outfit(session, occasion: str = "class", must_include: list[str] | Non
     """Rank outfits from the closet against the most recent plan_day_warmth result.
 
     for_whom names who this outfit is for (e.g. "me" or a friend's name), only needed when more
-    than one person shares this closet in the same session. When given, any item someone else is
+    than one person shares this closet in the same session. When given, an item someone else is
     currently wearing (update_wardrobe's worn_by, status "worn") is left out too, on top of the
-    laundry and exclude filters, since a shared physical item can't be worn by two people at once.
-    Omit for a single user; nothing changes for that case.
+    laundry and exclude filters, since a shared physical item can't be worn by two people at once
+    (and, once laundered, each needs their own wash, not a pass straight to someone else).
+    This only applies to garments worn directly against skin (tops, bottoms, dresses, legwear,
+    socks) for hygiene; outerwear, mid-layers, shoes and accessories stay available to everyone
+    regardless of who currently has them on. Omit for a single user; nothing changes for that case.
     """
     plan = session.last_plan
     if not plan:
@@ -153,7 +158,7 @@ def build_outfit(session, occasion: str = "class", must_include: list[str] | Non
         return json.dumps({"error": f"Unknown item ids {unknown}. Call list_wardrobe to see valid ids."})
 
     def _claimed_by_someone_else(item: dict) -> bool:
-        if not for_whom or not item.get("worn_by"):
+        if not for_whom or not item.get("worn_by") or slot(item) not in HYGIENE_SLOTS:
             return False
         return str(item["worn_by"]).strip().lower() != str(for_whom).strip().lower()
 
@@ -311,8 +316,11 @@ TOOLS = [
                                 "description": "Item ids the user does not want today."},
                     "for_whom": {"type": "string",
                                  "description": "Who this outfit is for, e.g. 'me' or a name. Only needed when "
-                                                "more than one person shares this closet; items someone else is "
-                                                "currently wearing (see update_wardrobe) are left out."},
+                                                "more than one person shares this closet; a top, bottom, dress, "
+                                                "legwear or socks someone else currently has on (see "
+                                                "update_wardrobe) is left out for hygiene, until laundered. "
+                                                "Outerwear, mid-layers, shoes and accessories stay available to "
+                                                "everyone regardless of who has them on."},
                 },
                 "required": [],
             },

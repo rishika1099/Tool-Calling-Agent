@@ -193,6 +193,21 @@ def test_build_outfit_for_whom_excludes_items_claimed_by_someone_else():
     assert "jeans-indigo" in {i["id"] for i in for_me["options"][0]["items"]}  # still available to its own wearer
 
 
+def test_build_outfit_for_whom_still_offers_outerwear_and_shoes_someone_else_has_on():
+    # Hygiene exclusion only applies to tops/bottoms/dresses/legwear/socks; a coat or shoes are
+    # fine to suggest to someone else even while another person currently has them on.
+    _, session = get_session(None)
+    session.last_plan = SHARED_PLAN
+    run_tool("update_wardrobe", {"item_ids": ["parka-black", "boots-leather"], "status": "worn", "worn_by": "me"},
+             session)
+
+    for_other = json.loads(run_tool("build_outfit", {"for_whom": "Alex", "must_include": ["parka-black", "boots-leather"]},
+                                     session))
+    picked = {i["id"] for i in for_other["options"][0]["items"]}
+    assert {"parka-black", "boots-leather"} <= picked
+    assert for_other["claimed_by_someone_else"] == []
+
+
 def test_build_outfit_without_for_whom_ignores_worn_by():
     _, session = get_session(None)
     session.last_plan = SHARED_PLAN
