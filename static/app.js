@@ -17,6 +17,7 @@ const A = !reduceMotion && window.anime?.animate ? window.anime : null;
 let sessionId = null;
 let pending = []; // uploaded photos not yet sent: {id, url}
 let lastOutfit = null; // latest build_outfit result
+let lastOutfitDate = null; // the plan_day_warmth date that outfit was built for, so the panel can say which day it's showing
 let closetItems = [];
 let shownPlan = null; // what the panels last animated, so a refresh doesn't replay
 let shownOutfit = null;
@@ -630,7 +631,9 @@ function renderOutfit() {
     if (fresh) optionIndex = 0;
     el.className = "";
     const byId = Object.fromEntries(closetItems.map((i) => [i.id, i]));
-    $("#outfit-meta").textContent = lastOutfit.skipped_in_laundry.length ? `Skipped: ${lastOutfit.skipped_in_laundry.join(", ")}` : "";
+    const dateNote = lastOutfitDate ? `For ${lastOutfitDate}` : "";
+    const laundryNote = lastOutfit.skipped_in_laundry.length ? `Skipped: ${lastOutfit.skipped_in_laundry.join(", ")}` : "";
+    $("#outfit-meta").textContent = [dateNote, laundryNote].filter(Boolean).join(" · ");
     el.innerHTML = `${lastOutfit.options.length > 1 ? carousel(lastOutfit.options, byId) : ""}<div id="option-detail"></div>`;
     el.querySelectorAll(".fc-card").forEach((card) => {
         card.addEventListener("click", () => focusCard(Number(card.dataset.i)));
@@ -753,11 +756,17 @@ async function sendMessage(text) {
         }
         const data = await res.json();
         sessionId = data.session_id;
+        // A single answer can plan more than one day (e.g. "today and tomorrow"); the panel can
+        // only show one, so pair the latest build_outfit with the plan_day_warmth that fed it.
+        let planDate = null;
         for (const call of data.tool_calls) {
+            if (call.name === "plan_day_warmth") {
+                try { planDate = JSON.parse(call.result).date || planDate; } catch (e) { /* ignore */ }
+            }
             if (call.name !== "build_outfit") continue;
             try {
                 const parsed = JSON.parse(call.result);
-                if (parsed.options) lastOutfit = parsed;
+                if (parsed.options) { lastOutfit = parsed; lastOutfitDate = planDate; }
             } catch (e) { /* ignore */ }
         }
         loading.remove();

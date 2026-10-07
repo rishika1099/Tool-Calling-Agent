@@ -51,6 +51,8 @@ def resolve_date(day: str, utc_offset_seconds: int) -> date:
         return local_today
     if day == "tomorrow":
         return local_today + timedelta(days=1)
+    if day in ("day after tomorrow", "the day after tomorrow"):
+        return local_today + timedelta(days=2)
     try:
         wanted = date.fromisoformat(day)
     except ValueError:
