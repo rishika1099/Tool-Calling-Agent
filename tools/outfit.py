@@ -148,10 +148,13 @@ def build_outfit(session, occasion: str = "class", must_include: list[str] | Non
     socks) for hygiene; outerwear, mid-layers, shoes and accessories stay available to everyone
     across different people and days without needing a wash in between - but NOT simultaneously:
     a single pair of boots is still one physical object, so for_whom also steers this pick away
-    from every item (every slot, not just the hygiene-sensitive ones) most recently picked for a
-    *different* for_whom this session, so two people asked about in the same answer don't both get
-    offered the identical physical item - coat or shoes included - before either has actually
-    claimed anything with update_wardrobe. This only kicks in once every owned unit of that item
+    from every item (every slot, not just the hygiene-sensitive ones) a *different* for_whom was
+    picked for this exact same day, so two people asked about today and tomorrow in the same
+    answer don't both get offered the identical physical item for the same day - coat or shoes
+    included - before either has actually claimed anything with update_wardrobe. Scoped per day
+    (from the most recent plan_day_warmth's date), not just per person, so building several of one
+    person's days in a row doesn't overwrite and lose an earlier day's protection before the other
+    for_whom's build for that same day runs. This only kicks in once every owned unit of that item
     is already claimed this way: owning 2 of something (set from the closet panel) means two
     people can legitimately both get offered it. This is a soft preference, not a hard rule, and
     backs off automatically if honoring it would leave no outfit at all. Omit for a single user;
@@ -176,14 +179,20 @@ def build_outfit(session, occasion: str = "class", must_include: list[str] | Non
     claimed = [i["name"] for i in session.wardrobe.values()
                if i["status"] != "in_laundry" and _claimed_by_someone_else(i)]
     summary = plan["summary"]
+    day = plan.get("date")
 
     # Only soft-avoid an item once every owned unit is already claimed by someone else's recent
-    # pick: owning 2 pairs of the same boots means two people genuinely can get offered "the same
-    # boots" without it being a physical conflict, so count claims against qty rather than
-    # excluding on the first match.
+    # pick *for this same day*: owning 2 pairs of the same boots means two people genuinely can
+    # get offered "the same boots" without it being a physical conflict, so count claims against
+    # qty rather than excluding on the first match. Scoped to the same day specifically - keyed by
+    # (for_whom, day) rather than for_whom alone - so building this same person's OTHER days in
+    # between doesn't overwrite and lose this day's protection before the other for_whom's build
+    # for this exact day runs (which previously let two people both get offered the same top/
+    # bottom for the same day, as long as the model built several of one person's days first).
     elsewhere_claims = Counter(
-        iid for who, ids in session.recent_picks.items()
-        if for_whom and who.strip().lower() != for_whom.strip().lower() for iid in ids)
+        iid for (who, picked_day), ids in session.recent_picks.items()
+        if for_whom and who.strip().lower() != for_whom.strip().lower() and picked_day == day
+        for iid in ids)
     recent_elsewhere = [iid for iid, claims in elsewhere_claims.items()
                          if claims >= session.wardrobe.get(iid, {}).get("qty", 1)]
 
@@ -232,7 +241,7 @@ def build_outfit(session, occasion: str = "class", must_include: list[str] | Non
 
     session.last_outfit = [i["id"] for i in options[0]["items"]]
     if for_whom:
-        session.recent_picks[for_whom] = [i["id"] for i in options[0]["items"]]
+        session.recent_picks[(for_whom, day)] = [i["id"] for i in options[0]["items"]]
     return json.dumps({
         "date": plan.get("date"),
         "for_whom": for_whom or "me",
@@ -359,8 +368,8 @@ TOOLS = [
                 "Always call plan_day_warmth first. For a shared closet, pass for_whom: a top, bottom, dress, "
                 "legwear or sock someone else already has on is left out, and this call also automatically "
                 "steers away from every item (any slot, including coats and shoes - a single pair of boots "
-                "can't be on two people on the same day) a different for_whom was most recently picked for "
-                "this session, even before anything is confirmed with update_wardrobe."
+                "can't be on two people on the same day) a different for_whom was picked for this exact "
+                "same day, even before anything is confirmed with update_wardrobe."
             ),
             "parameters": {
                 "type": "object",

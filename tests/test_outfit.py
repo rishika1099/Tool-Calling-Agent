@@ -274,6 +274,49 @@ def test_build_outfit_steers_a_different_for_whom_away_from_the_same_items():
     assert not (me_ids & alex_ids)  # no shared item at all between the two same-session picks
 
 
+def test_recent_picks_keeps_a_separate_entry_per_day_not_just_per_person():
+    # Reported: asked for two people across two days in one message, the same top and bottom got
+    # offered to both people on BOTH days. Root cause: recent_picks was keyed by for_whom alone,
+    # so building the same person's day 2 overwrote and lost the record of their day 1 pick before
+    # the other person's day 1 build ever ran - exactly what happens if the model finishes one
+    # person's whole multi-day plan before starting the other's, rather than strictly alternating
+    # day-by-day between people (which the prompt asks for, but can't be relied on alone).
+    _, session = get_session(None)
+    session.last_plan = {**SHARED_PLAN, "date": "2026-10-07"}
+    run_tool("build_outfit", {"for_whom": "me"}, session)
+    day1_picks = session.recent_picks.get(("me", "2026-10-07"))
+    assert day1_picks  # stored under a day-specific key
+
+    session.last_plan = {**SHARED_PLAN, "date": "2026-10-08"}
+    run_tool("build_outfit", {"for_whom": "me"}, session)
+    # Day 1's entry must still be there, unchanged - not overwritten by day 2's build for the same
+    # person, which is exactly what the old for_whom-only key did.
+    assert session.recent_picks.get(("me", "2026-10-07")) == day1_picks
+    assert session.recent_picks.get(("me", "2026-10-08"))
+
+
+def test_build_outfit_avoids_overlap_on_an_earlier_day_even_after_a_later_day_is_built():
+    # Behavioral version of the test above: the earlier day's protection must still be live by
+    # the time the other person's build for that same earlier day actually runs.
+    _, session = get_session(None)
+    for item in session.wardrobe.values():
+        if slot(item) == "bottom" and item["id"] != "jeans-indigo":
+            item["status"] = "in_laundry"  # jeans-indigo is the only bottom left
+
+    session.last_plan = {**SHARED_PLAN, "date": "2026-10-07"}
+    me_day1 = json.loads(run_tool("build_outfit", {"for_whom": "me"}, session))
+    assert "jeans-indigo" in {i["id"] for i in me_day1["options"][0]["items"]}  # only bottom available
+
+    session.last_plan = {**SHARED_PLAN, "date": "2026-10-08"}
+    run_tool("build_outfit", {"for_whom": "me"}, session)  # me's day 2 - must not clobber day 1's record
+
+    session.last_plan = {**SHARED_PLAN, "date": "2026-10-07"}
+    sister_day1 = json.loads(run_tool("build_outfit", {"for_whom": "sister"}, session))
+    # jeans-indigo is still the only bottom in the whole closet, so sister either gets a dress
+    # instead (correctly avoiding it) or the request fails outright - never jeans-indigo itself.
+    assert "jeans-indigo" not in {i["id"] for i in sister_day1["options"][0]["items"]}
+
+
 def test_build_outfit_allows_sharing_an_item_owned_in_multiples():
     # Owning 2 of something (set from the closet panel) means two people can legitimately both
     # get offered it - the soft avoid-duplicate check should only kick in once every owned unit
