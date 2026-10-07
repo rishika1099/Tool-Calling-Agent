@@ -26,10 +26,12 @@ class Session:
     person_photo_id: str | None = None  # the user's full-body photo, for try-on
     setup_done: bool = False  # finished "Build your digital closet" (or chose the demo closet)
     previews: list[str] = field(default_factory=list)  # ids of try-on images, oldest first
-    recent_picks: dict[str, list[str]] = field(default_factory=dict)  # for_whom -> their most recent
-    # build_outfit top pick's item ids (every slot, not just skin-touching ones - a single pair of
-    # boots is still one physical object), so build_outfit can automatically steer a different
-    # for_whom away from suggesting the exact same item before either has actually claimed anything
+    recent_picks: dict[tuple[str, str], list[str]] = field(default_factory=dict)  # (for_whom, day) ->
+    # that build_outfit call's top pick's item ids (every slot, not just skin-touching ones - a
+    # single pair of boots is still one physical object), so build_outfit can automatically steer a
+    # different for_whom away from suggesting the exact same item for the exact same day, before
+    # either has actually claimed anything with update_wardrobe. Keyed by day (not just for_whom)
+    # so a person's own later-day pick doesn't overwrite and lose their earlier day's protection.
 
     @classmethod
     def new(cls, system_prompt: str, session_id: str = "") -> "Session":
