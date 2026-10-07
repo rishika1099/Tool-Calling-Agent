@@ -2,6 +2,9 @@
 
 import json
 
+from fastapi.testclient import TestClient
+
+import app as app_module
 from app import get_session
 from tools import run_tool
 from tools.catalog import wear_limit
@@ -90,8 +93,71 @@ def test_list_wardrobe_reports_worn_by():
     assert items["jeans-indigo"]["worn_by"] == "Alex"
 
 
+def test_qty_defaults_to_one_and_is_exposed():
+    _, session = get_session(None)
+    items = {i["id"]: i for i in json.loads(run_tool("list_wardrobe", {}, session))["items"]}
+    assert items["tee-white"]["qty"] == 1 and items["tee-white"]["qty_in_laundry"] == 0
+
+
+def test_multi_unit_item_sends_one_unit_to_laundry_per_worn_call():
+    # tee-white's wear limit is 1, so each "worn" call should dirty exactly one more unit.
+    _, session = get_session(None)
+    session.wardrobe["tee-white"]["qty"] = 3
+    run_tool("update_wardrobe", {"item_ids": ["tee-white"], "status": "worn"}, session)
+    item = session.wardrobe["tee-white"]
+    assert item["qty_in_laundry"] == 1 and item["status"] == "worn"  # 2 of 3 still available
+    run_tool("update_wardrobe", {"item_ids": ["tee-white"], "status": "worn"}, session)
+    run_tool("update_wardrobe", {"item_ids": ["tee-white"], "status": "worn"}, session)
+    assert item["qty_in_laundry"] == 3 and item["status"] == "in_laundry"  # none left
+
+
+def test_clean_status_fully_restocks_a_multi_unit_item():
+    _, session = get_session(None)
+    session.wardrobe["tee-white"]["qty"] = 3
+    for _ in range(3):
+        run_tool("update_wardrobe", {"item_ids": ["tee-white"], "status": "worn"}, session)
+    run_tool("update_wardrobe", {"item_ids": ["tee-white"], "status": "clean"}, session)
+    item = session.wardrobe["tee-white"]
+    assert item["qty_in_laundry"] == 0 and item["wears"] == 0 and item["status"] == "clean"
+
+
+def test_wardrobe_qty_endpoint_clamps_laundry_count_and_minimum():
+    client = TestClient(app_module.app)
+    sid = client.get("/wardrobe").json()["session_id"]
+    client.post("/wardrobe/qty", json={"session_id": sid, "item_id": "tee-white", "qty": 3})
+    client.post("/wardrobe/status", json={"session_id": sid, "item_ids": ["tee-white"], "status": "in_laundry"})
+    client.post("/wardrobe/status", json={"session_id": sid, "item_ids": ["tee-white"], "status": "in_laundry"})
+    res = client.post("/wardrobe/qty", json={"session_id": sid, "item_id": "tee-white", "qty": 1}).json()
+    assert res["qty"] == 1 and res["qty_in_laundry"] == 1  # clamped down to match the lowered qty
+    assert client.post("/wardrobe/qty", json={"session_id": sid, "item_id": "tee-white", "qty": 0}).json()["qty"] == 1
+
+
+def test_wardrobe_unlaundry_endpoint_decrements_without_touching_wears():
+    client = TestClient(app_module.app)
+    sid = client.get("/wardrobe").json()["session_id"]
+    client.post("/wardrobe/qty", json={"session_id": sid, "item_id": "tee-white", "qty": 2})
+    client.post("/wardrobe/status", json={"session_id": sid, "item_ids": ["tee-white"], "status": "in_laundry"})
+    client.post("/wardrobe/status", json={"session_id": sid, "item_ids": ["tee-white"], "status": "in_laundry"})
+    res = client.post("/wardrobe/unlaundry", json={"session_id": sid, "item_id": "tee-white"}).json()
+    assert res["qty_in_laundry"] == 1 and res["status"] == "clean"  # wears was never touched by "in_laundry" calls
+
+
 SHARED_PLAN = {"summary": {"outdoor_clo_min": 0.6, "outdoor_clo_ideal": 0.9,
                             "indoor_clo_min": 0.4, "indoor_clo_ideal": 0.6, "max_wind_mph": 5}}
+
+
+def test_partially_dirty_item_still_counts_as_available_to_build_outfit():
+    # jeans' wear limit is 5, so one pair of 2 owned goes to the laundry well before
+    # the item becomes fully unavailable.
+    _, session = get_session(None)
+    session.last_plan = SHARED_PLAN
+    session.wardrobe["jeans-indigo"]["qty"] = 2
+    for _ in range(5):
+        run_tool("update_wardrobe", {"item_ids": ["jeans-indigo"], "status": "worn"}, session)
+    item = session.wardrobe["jeans-indigo"]
+    assert item["qty_in_laundry"] == 1 and item["status"] != "in_laundry"  # 1 of 2 still available
+    result = json.loads(run_tool("build_outfit", {"must_include": ["jeans-indigo"]}, session))
+    assert "jeans-indigo" in {i["id"] for i in result["options"][0]["items"]}
 
 
 def test_build_outfit_for_whom_excludes_items_claimed_by_someone_else():
