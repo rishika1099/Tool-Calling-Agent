@@ -1,3 +1,4 @@
+import functools
 import hashlib
 import json
 import re
@@ -334,10 +335,17 @@ def clear(session_id: str | None = None):
     return {"status": "ok"}
 
 
+@functools.cache
+def _photo_version(photo: str) -> str:
+    """Content hash of a demo closet photo, so a replaced photo gets a new URL past browser caches."""
+    path = STATIC / photo
+    return hashlib.sha256(path.read_bytes()).hexdigest()[:8] if path.is_file() else "0"
+
+
 def item_view(session_id: str, item: dict) -> dict:
     """An item as the page needs it: slot, warmth, wear limit, and where its photo lives (if any)."""
     photo = (f"/image/{session_id}/{item['photo_id']}" if item.get("photo_id")
-             else f"/static/{item['photo']}" if item.get("photo") else None)
+             else f"/static/{item['photo']}?v={_photo_version(item['photo'])}" if item.get("photo") else None)
     return {**item, "slot": slot(item), "clo": clo(item), "wear_limit": wear_limit(item), "photo_url": photo}
 
 

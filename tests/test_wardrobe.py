@@ -193,7 +193,7 @@ def test_demo_closet_photos_exist_and_are_served():
     assert len(with_photo) == len(items) == 41  # every demo piece has a photo
     for item in with_photo:
         assert item["photo_url"].startswith("/static/closet/")
-        assert (app_module.STATIC / item["photo_url"].removeprefix("/static/")).is_file(), item["id"]
+        assert (app_module.STATIC / item["photo_url"].removeprefix("/static/").split("?")[0]).is_file(), item["id"]
     assert client.get(with_photo[0]["photo_url"]).headers["content-type"] == "image/jpeg"
     assert all((app_module.STATIC / i["photo"]).is_file() for i in items if i.get("photo"))
 

@@ -1258,7 +1258,7 @@ $("#me-clear").addEventListener("click", () => setMe(null));
 // For trying it without your own picture: a fictional, AI-generated person.
 $("#me-sample").addEventListener("click", async () => {
     try {
-        const blob = await (await fetch("/static/sample-person.jpg")).blob();
+        const blob = await (await fetch("/static/sample-person.jpg", { cache: "no-cache" })).blob();
         await setMe((await uploadFile(new File([blob], "sample-person.jpg", { type: "image/jpeg" }))).image_id);
     } catch (err) {
         $("#me-note").textContent = err.message;
