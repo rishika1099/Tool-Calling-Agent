@@ -817,6 +817,20 @@ body.in-setup #composer { display: none; }
     color: var(--accent-ink);
 }
 .item.selected { border-color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); }
+/* A shared-closet item someone else currently has on: same ribbon as "in laundry", different
+   color so the two are easy to tell apart (they're mutually exclusive in practice). */
+.item[data-worn-by]::after {
+    content: attr(data-worn-by);
+    position: absolute;
+    top: 8px;
+    right: -28px;
+    transform: rotate(35deg);
+    padding: 2px 28px;
+    font: 500 8px/1.4 var(--mono);
+    text-transform: uppercase;
+    background: var(--ok);
+    color: #ffffff;
+}
 
 /* ---------- Add clothes ---------- */
 
