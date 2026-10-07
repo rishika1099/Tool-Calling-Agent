@@ -811,6 +811,20 @@ function addUserMessage(text, photos) {
     if (A) safeAnimate(div, { opacity: { from: 0 }, translateX: { from: 24 }, scale: { from: 0.96 }, duration: 600, ease: "outExpo" });
 }
 
+// A short label distinguishing one tool call from another of the same name, since a complex
+// multi-day/multi-person turn legitimately calls plan_day_warmth/build_outfit/update_wardrobe
+// once per day-and-person combo - several identical tool names in a row look like a repeated/
+// wasted call at a glance unless each one's summary says which day or person it was actually for.
+function toolCallHint(call) {
+    const args = call.args || {};
+    let result = {};
+    try { result = JSON.parse(call.result); } catch (e) { /* not JSON */ }
+    if (call.name === "plan_day_warmth") return [args.day, args.cold_sensitivity].filter(Boolean).join(" · ");
+    if (call.name === "build_outfit") return [result.for_whom, result.date].filter(Boolean).join(" · ");
+    if (call.name === "update_wardrobe") return [args.worn_by, args.worn_for].filter(Boolean).join(" · ");
+    return "";
+}
+
 function addAssistantMessage(response, toolCalls) {
     // Each piece (the tool-calls box, the response text, any try-on figure) is built in its own
     // try/catch and appended independently: a complex multi-day/multi-person turn has more tool
@@ -828,7 +842,8 @@ function addAssistantMessage(response, toolCalls) {
                 const details = document.createElement("details");
                 let pretty = call.result;
                 try { pretty = JSON.stringify(JSON.parse(call.result), null, 2); } catch (e) { /* not JSON */ }
-                details.innerHTML = `<summary><b>${escapeHtml(call.name)}</b></summary>
+                const hint = toolCallHint(call);
+                details.innerHTML = `<summary><b>${escapeHtml(call.name)}</b>${hint ? ` <span class="tool-hint">${escapeHtml(hint)}</span>` : ""}</summary>
                     <pre>${escapeHtml(`args: ${JSON.stringify(call.args, null, 2)}\n\nresult: ${pretty}`)}</pre>`;
                 tools.appendChild(details);
             }

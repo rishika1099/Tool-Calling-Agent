@@ -538,6 +538,7 @@ body.in-setup #composer { display: none; }
 .tools summary::-webkit-details-marker { display: none; }
 .tools summary::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: var(--accent); }
 .tools summary b { color: var(--ink); font-weight: 500; }
+.tools summary .tool-hint { color: var(--soft); font-size: 10.5px; }
 .tools pre {
     margin-top: 6px;
     padding: 12px 14px;
