@@ -14,10 +14,12 @@ Three layers of testing, cheapest first. Run all of them before submitting; run 
 
 Status is from the live run on **Oct 4, 2026** (commit `68458ce`, tested at layer-lab.cloud.run),
 **except where marked "Oct 7"** below: those rows were re-checked offline (code-level, no live
-Gemini/Cloud Run access available) after PRs #17-21 landed (date-anchoring, multi-person sharing,
-item quantity/laundry, day tags, hygiene-scoped sharing, and three new tools). A lot of code
-changed between Oct 4 and Oct 7 - **re-run the live checks below before submitting tonight**,
-don't trust the Oct 4 "pass" marks for anything that touches those features.
+Gemini/Cloud Run access available) after PR #21 landed on top of PRs #17-20 (date-anchoring,
+multi-person sharing, item quantity/laundry, day tags, hygiene-scoped sharing, three new wardrobe
+tools, the tool-call round limit raised from 8 to 20, and markdown rendering gaining headings,
+horizontal rules and nested bullets for multi-person/multi-day answers). A lot of code changed
+between Oct 4 and Oct 7 - **re-run the live checks below before submitting tonight**, don't trust
+the Oct 4 "pass" marks for anything that touches those features.
 
 ### Basics (1 point)
 | Check | How | Status |
