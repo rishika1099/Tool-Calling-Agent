@@ -861,20 +861,20 @@ async function sendMessage(text) {
         const data = await res.json();
         sessionId = data.session_id;
         // A single answer can plan more than one day, and more than one person, in one go (e.g.
-        // "today and tomorrow", or "for me and my roommate"). Pair each build_outfit with the
-        // plan_day_warmth that fed it (for its day) and its own for_whom (for its person), and
-        // keep every day/person combination seen this conversation, not just the latest.
-        let planDate = null;
+        // "today and tomorrow", or "for me and my roommate"). Each build_outfit result carries its
+        // own date and for_whom directly (tools/outfit.py), so every entry is keyed from data the
+        // call itself returned — not from tracking the most recent plan_day_warmth call seen so
+        // far, which broke if the model ever planned more than one day before building either
+        // outfit (every build_outfit would wrongly pair with whichever plan was last, mislabeling
+        // earlier days and colliding on the same Map key). Keep every day/person combination seen
+        // this conversation, not just the latest.
         for (const call of data.tool_calls) {
-            if (call.name === "plan_day_warmth") {
-                try { planDate = JSON.parse(call.result).date || planDate; } catch (e) { /* ignore */ }
-            }
             if (call.name !== "build_outfit") continue;
             try {
                 const parsed = JSON.parse(call.result);
                 if (!parsed.options) continue;
-                const forWhom = call.args?.for_whom || "me";
-                const day = planDate || "today";
+                const forWhom = parsed.for_whom || call.args?.for_whom || "me";
+                const day = parsed.date || "today";
                 const key = `${forWhom}||${day}`;
                 outfitEntries.set(key, { key, forWhom, day, outfit: parsed, optionIndex: 0, shown: false });
                 focusedEntryKey = key;

@@ -165,6 +165,21 @@ SHARED_PLAN = {"summary": {"outdoor_clo_min": 0.6, "outdoor_clo_ideal": 0.9,
                             "indoor_clo_min": 0.4, "indoor_clo_ideal": 0.6, "max_wind_mph": 5}}
 
 
+def test_build_outfit_result_carries_its_own_date_and_for_whom():
+    # The frontend pairs each build_outfit result with its own day and person directly from the
+    # result itself (not by tracking the most recent plan_day_warmth/for_whom seen in call order),
+    # so a multi-day or multi-person answer tags the right day and name even if the model doesn't
+    # call plan_day_warmth immediately before every build_outfit.
+    _, session = get_session(None)
+    session.last_plan = {**SHARED_PLAN, "date": "2026-10-09"}
+    result = json.loads(run_tool("build_outfit", {"for_whom": "Alex"}, session))
+    assert result["date"] == "2026-10-09"
+    assert result["for_whom"] == "Alex"
+
+    no_for_whom = json.loads(run_tool("build_outfit", {}, session))
+    assert no_for_whom["for_whom"] == "me"  # defaults to "me" when omitted (single-user case)
+
+
 def test_partially_dirty_item_still_counts_as_available_to_build_outfit():
     # jeans' wear limit is 5, so one pair of 2 owned goes to the laundry well before
     # the item becomes fully unavailable.

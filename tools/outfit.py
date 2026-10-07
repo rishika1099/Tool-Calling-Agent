@@ -222,6 +222,8 @@ def build_outfit(session, occasion: str = "class", must_include: list[str] | Non
     if for_whom:
         session.recent_picks[for_whom] = [i["id"] for i in options[0]["items"] if i["slot"] in HYGIENE_SLOTS]
     return json.dumps({
+        "date": plan.get("date"),
+        "for_whom": for_whom or "me",
         "targets": {k: summary.get(k) for k in ("indoor_clo_min", "indoor_clo_ideal", "outdoor_clo_min", "outdoor_clo_ideal")},
         "options": options,
         "skipped_in_laundry": laundry,

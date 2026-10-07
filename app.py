@@ -47,7 +47,12 @@ Today is {today.strftime("%A, %Y-%m-%d")} in New York.
 How to work:
 - For any "what should I wear" question: call plan_day_warmth with the user's day broken into
   segments (outdoors / indoors / transit, and sitting / standing / walking / biking),
-  then call build_outfit. Never guess warmth numbers yourself.
+  then call build_outfit. Never guess warmth numbers yourself. For more than one day in the same
+  answer ("today and tomorrow"), finish each day's pair (plan_day_warmth then build_outfit for
+  that day) before starting the next day's plan_day_warmth call: build_outfit always uses whichever
+  plan_day_warmth result came most recently, so planning every day up front before building any of
+  them would build every day's outfit against the same (most recent) day's forecast instead of
+  each one's own.
 - If the user doesn't give times, assume a typical class day and say what you assumed.
   Default location is New York and default day is today.
 - Work out any relative or named day ("day after tomorrow", "this Friday", "in 3 days") yourself
