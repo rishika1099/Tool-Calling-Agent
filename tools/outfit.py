@@ -14,6 +14,9 @@ from .catalog import INDOOR_SLOTS, clo, is_windproof, keeps_rain_out, slot, wear
 UNDERWEAR_CLO = 0.04  # assumed, not tracked in the closet
 BARE_LEG_TYPES = {"skirt_thin", "skirt_thick", "dress_thin", "dress_thick", "shorts"}
 COLD_DAY_CLO = 0.7  # outdoor warmth needed above which the warm socks go on
+VARIETY_SLACK = 0.2  # penalty an option may give up to repeat fewer pieces from the others
+VARIETY_WINDOW = 4000  # how far down the ranking to look for that
+MAX_STYLED = 40000  # most outfits to style-score in one search
 STYLE_WEIGHT = 0.25  # penalty per style point lost (out of 10)
 SHORT_JACKETS = {"denim_jacket", "bomber_jacket", "leather_jacket"}
 OCCASIONS = {"everyday": 1, "class": 1, "date": 2, "dinner": 2, "party": 2, "work": 2, "interview": 3}  # minimum formality
@@ -126,6 +129,39 @@ def _add_style(result: dict, outfit: list[dict], occasion: str) -> dict:
     if result["style"] is not None:
         result["penalty"] += (10 - result["style"]["score"]) * STYLE_WEIGHT
     return result
+
+
+def _varied(ranked: list, n: int = 3, strict: bool = False) -> list:
+    """The n best outfits that look different from each other, best first.
+
+    ranked is (result, outfit) pairs, lowest penalty first. Each pick gets its own top and its
+    own bottom (or dress), so the options are not one outfit with the trousers swapped. If the
+    closet is too small for that, the rest are filled with any look not picked yet (unless strict).
+    """
+    picks, used, looks, worn = [], set(), set(), set()
+    for at, pair in enumerate(ranked):
+        if set(_look(pair[1])) & used:
+            continue
+        # Among outfits about as good as this one, take the one that repeats the fewest pieces
+        # (knit, coat, shoes) from the options already picked.
+        close = [p for p in ranked[at:at + VARIETY_WINDOW] if p[0]["penalty"] <= pair[0]["penalty"] + VARIETY_SLACK
+                 and not set(_look(p[1])) & used]
+        pair = min(close, key=lambda p: (sum(1 for i in p[1] if i["id"] in worn and slot(i) in ("mid_top", "outer", "shoes")),
+                                         p[0]["penalty"]))
+        picks.append(pair)
+        used |= set(_look(pair[1]))
+        looks.add(_look(pair[1]))
+        worn |= {i["id"] for i in pair[1]}
+        if len(picks) == n:
+            return sorted(picks, key=lambda p: p[0]["penalty"])
+    if not strict:
+        for pair in ranked:
+            if _look(pair[1]) not in looks:
+                picks.append(pair)
+                looks.add(_look(pair[1]))
+                if len(picks) == n:
+                    break
+    return sorted(picks, key=lambda pair: pair[0]["penalty"])
 
 
 def _look(outfit: list[dict]) -> tuple:
@@ -274,14 +310,19 @@ def build_outfit(session, occasion: str = "class", must_include: list[str] | Non
         rough = [(_evaluate(outfit, summary, occasion, with_style=False), outfit) for outfit in _combos(wearable)
                  if needed <= {i["id"] for i in outfit}]
         rough.sort(key=lambda pair: pair[0]["penalty"])
-        scored, best = [], {}
-        for result, outfit in rough:
-            if len(best) >= 3 and result["penalty"] > sorted(best.values())[2]:
+        scored, best = [], {}  # best: look -> its best (result, outfit) so far
+        for n, (result, outfit) in enumerate(rough):
+            if len(best) >= 3 and n % 200 == 0:
+                picks = _varied(sorted(best.values(), key=lambda pair: pair[0]["penalty"]), strict=True)
+                if len(picks) == 3 and result["penalty"] > picks[-1][0]["penalty"]:
+                    break
+            if len(scored) >= MAX_STYLED:
                 break
             _add_style(result, outfit, occasion)
             scored.append((result, outfit))
             look = _look(outfit)
-            best[look] = min(best.get(look, result["penalty"]), result["penalty"])
+            if look not in best or result["penalty"] < best[look][0]["penalty"]:
+                best[look] = (result, outfit)
         return scored, accessories
 
     scored, accessories = _score(soft_avoid)
@@ -294,12 +335,8 @@ def build_outfit(session, occasion: str = "class", must_include: list[str] | Non
                                     "(or a dress) that are not in the laundry and not excluded."})
     scored.sort(key=lambda pair: pair[0]["penalty"])
 
-    options, seen = [], set()
-    for result, outfit in scored:
-        key = _look(outfit)  # three options that differ in more than the coat
-        if key in seen:
-            continue
-        seen.add(key)
+    options = []
+    for result, outfit in _varied(scored):
         extras = _add_accessories(result, accessories, summary.get("outdoor_clo_ideal"))
         options.append({
             "items": [{"id": i["id"], "name": i["name"], "slot": slot(i), "clo": clo(i)} for i in outfit + extras],
@@ -311,8 +348,6 @@ def build_outfit(session, occasion: str = "class", must_include: list[str] | Non
             "notes": result["notes"],
             "style": result["style"],
         })
-        if len(options) == 3:
-            break
 
     session.last_outfit = [i["id"] for i in options[0]["items"]]
     session.recent_picks[(who_key, day)] = [i["id"] for i in options[0]["items"]]

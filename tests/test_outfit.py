@@ -431,3 +431,17 @@ def test_interview_outfit_is_dressed_up():
     for option in options:
         ids = {item["id"] for item in option["items"]}
         assert not {"coat-camel", "jacket-denim"} <= ids  # never a blazer under a denim jacket
+
+
+def test_the_three_options_are_three_different_outfits():
+    """Each option has its own top and bottom, and they don't all share one coat and one pair of shoes."""
+    _, session = get_session(None)
+    session.last_plan = {"summary": {"outdoor_clo_min": 1.05, "outdoor_clo_ideal": 1.42, "indoor_clo_min": 0.83,
+                                     "indoor_clo_ideal": 1.17, "max_wind_mph": 7}}
+    options = json.loads(run_tool("build_outfit", {"occasion": "class"}, session))["options"]
+    assert len(options) == 3
+    for kind in ("base_top", "bottom", "one_piece"):
+        ids = [i["id"] for o in options for i in o["items"] if i["slot"] == kind]
+        assert len(ids) == len(set(ids)), kind  # no top, bottom or dress appears twice
+    for kind in ("outer", "shoes"):
+        assert len({i["id"] for o in options for i in o["items"] if i["slot"] == kind}) > 1, kind
