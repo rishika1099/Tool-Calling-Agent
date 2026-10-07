@@ -173,6 +173,7 @@ def add_item(session, fields: dict) -> dict:
         "user_added": True,
         "status": "clean",
         "wears": 0,
+        "worn_by": None,
     }
     session.wardrobe[item_id] = item
     return item

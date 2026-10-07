@@ -62,6 +62,63 @@ def test_manual_laundry_toggle_is_unaffected_by_wear_limit():
     assert "note" not in result
 
 
+def test_update_wardrobe_sets_and_clears_worn_by():
+    _, session = get_session(None)
+    result = json.loads(run_tool("update_wardrobe",
+                                  {"item_ids": ["jeans-indigo"], "status": "worn", "worn_by": "Alex"}, session))
+    assert session.wardrobe["jeans-indigo"]["worn_by"] == "Alex"
+    assert result["updated"][0]["worn_by"] == "Alex"
+    run_tool("update_wardrobe", {"item_ids": ["jeans-indigo"], "status": "clean"}, session)
+    assert session.wardrobe["jeans-indigo"]["worn_by"] is None
+
+
+def test_worn_by_does_not_stick_to_an_item_that_hits_its_wear_limit():
+    # tee-white's wear limit is 1, so this call sends it straight to the laundry; nobody
+    # "has" a laundered item, so worn_by should not be left set.
+    _, session = get_session(None)
+    run_tool("update_wardrobe", {"item_ids": ["tee-white"], "status": "worn", "worn_by": "Alex"}, session)
+    assert session.wardrobe["tee-white"]["status"] == "in_laundry"
+    assert session.wardrobe["tee-white"]["worn_by"] is None
+
+
+def test_list_wardrobe_reports_worn_by():
+    _, session = get_session(None)
+    items = {i["id"]: i for i in json.loads(run_tool("list_wardrobe", {}, session))["items"]}
+    assert items["jeans-indigo"]["worn_by"] is None
+    run_tool("update_wardrobe", {"item_ids": ["jeans-indigo"], "status": "worn", "worn_by": "Alex"}, session)
+    items = {i["id"]: i for i in json.loads(run_tool("list_wardrobe", {}, session))["items"]}
+    assert items["jeans-indigo"]["worn_by"] == "Alex"
+
+
+SHARED_PLAN = {"summary": {"outdoor_clo_min": 0.6, "outdoor_clo_ideal": 0.9,
+                            "indoor_clo_min": 0.4, "indoor_clo_ideal": 0.6, "max_wind_mph": 5}}
+
+
+def test_build_outfit_for_whom_excludes_items_claimed_by_someone_else():
+    _, session = get_session(None)
+    session.last_plan = SHARED_PLAN
+    run_tool("update_wardrobe", {"item_ids": ["jeans-indigo"], "status": "worn", "worn_by": "me"}, session)
+
+    for_other = json.loads(run_tool("build_outfit", {"for_whom": "Alex"}, session))
+    picked = {i["id"] for opt in for_other["options"] for i in opt["items"]}
+    assert "jeans-indigo" not in picked
+    assert "Indigo jeans" in for_other["claimed_by_someone_else"]
+
+    for_me = json.loads(run_tool("build_outfit", {"for_whom": "me", "must_include": ["jeans-indigo"]}, session))
+    assert "jeans-indigo" in {i["id"] for i in for_me["options"][0]["items"]}  # still available to its own wearer
+
+
+def test_build_outfit_without_for_whom_ignores_worn_by():
+    _, session = get_session(None)
+    session.last_plan = SHARED_PLAN
+    run_tool("update_wardrobe", {"item_ids": ["jeans-indigo"], "status": "worn", "worn_by": "Alex"}, session)
+    result = json.loads(run_tool("build_outfit", {}, session))  # no for_whom: old single-person behavior
+    assert result["claimed_by_someone_else"] == []
+    # Still selectable (not silently filtered out) now that for_whom isn't in play, same as before this feature existed.
+    forced = json.loads(run_tool("build_outfit", {"must_include": ["jeans-indigo"]}, session))
+    assert "jeans-indigo" in {i["id"] for i in forced["options"][0]["items"]}
+
+
 def test_interview_outfit_is_dressed_up():
     """A cool day, jeans in the wash: the interview pick is tailored, not a puffer, sweatpants or sneakers."""
     _, session = get_session(None)
