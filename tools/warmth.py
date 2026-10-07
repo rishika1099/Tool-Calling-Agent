@@ -147,28 +147,16 @@ def _parse_start(start: str) -> tuple[int, int]:
         raise ForecastError(f"Segment start '{start}' is not valid. Use 24-hour HH:MM, e.g. '08:00' or '18:30'.")
 
 
-def plan_day_warmth(session, segments: list[dict], location: str = "New York", day: str = "today",
-                     cold_sensitivity: str | None = None) -> str:
-    """Warmth needed (clo) for each part of a day, plus a layering plan.
-
-    By default this plans for the primary user: it reads session.cold_sensitivity and adds
-    session.comfort_offset, their own personally learned feedback adjustment. Pass cold_sensitivity
-    to plan for someone else who shares this chat (e.g. a roommate or friend) without touching the
-    user's saved setting: the override replaces session.cold_sensitivity for this call only, and
-    comfort_offset is deliberately not added, since that adjustment was learned from the primary
-    user's own feedback and should not be assumed for another person.
-    """
+def plan_day_warmth(session, segments: list[dict], location: str = "New York", day: str = "today") -> str:
+    """Warmth needed (clo) for each part of the user's day, plus a layering plan."""
     if not segments:
         return json.dumps({"error": "Give at least one segment, e.g. {'start': '08:00', 'minutes': 20, 'activity': 'walking', 'setting': 'outdoors'}."})
-    if cold_sensitivity is not None and cold_sensitivity not in SENSITIVITY_OFFSET:
-        return json.dumps({"error": f"cold_sensitivity must be one of {list(SENSITIVITY_OFFSET)}."})
     try:
         place, wanted, hours = hourly_for_day(location, day)
         by_hour = {h["hour"]: h for h in hours}
         daytime = [h["temp_c"] for h in hours if 6 <= h["hour"] < 22]
         heating_on = sum(daytime) / len(daytime) < HEAT_LAW_C
-        sensitivity = cold_sensitivity or session.cold_sensitivity
-        offset = SENSITIVITY_OFFSET[sensitivity] + (0.0 if cold_sensitivity else session.comfort_offset)
+        offset = SENSITIVITY_OFFSET[session.cold_sensitivity] + session.comfort_offset
 
         planned = []
         for seg in segments:
@@ -234,7 +222,7 @@ def plan_day_warmth(session, segments: list[dict], location: str = "New York", d
     plan = {
         "location": place["name"],
         "date": wanted.isoformat(),
-        "cold_sensitivity": sensitivity,
+        "cold_sensitivity": session.cold_sensitivity,
         "personal_adjustment_clo": round(offset, 2),
         "buildings_heated": heating_on,
         "segments": planned,
@@ -311,13 +299,6 @@ TOOLS = [
                     },
                     "location": {"type": "string", "description": "City name. Defaults to New York."},
                     "day": {"type": "string", "description": "'today', 'tomorrow', or YYYY-MM-DD within the next 7 days."},
-                    "cold_sensitivity": {
-                        "type": "string", "enum": list(SENSITIVITY_OFFSET),
-                        "description": "Only when planning for someone other than the primary user who shares this "
-                                       "chat, e.g. a friend or roommate. Overrides the saved setting for this call "
-                                       "only and skips the user's own learned comfort adjustment. Omit for the "
-                                       "primary user.",
-                    },
                 },
                 "required": ["segments"],
             },

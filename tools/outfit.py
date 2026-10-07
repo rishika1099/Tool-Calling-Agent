@@ -132,16 +132,8 @@ def _fit(value: float, lo: float | None, hi: float | None) -> str:
     return "comfortable" if value >= hi - 0.15 else "a little cool"
 
 
-def build_outfit(session, occasion: str = "class", must_include: list[str] | None = None,
-                  exclude: list[str] | None = None, for_whom: str | None = None) -> str:
-    """Rank outfits from the closet against the most recent plan_day_warmth result.
-
-    for_whom names who this outfit is for (e.g. "me" or a friend's name), only needed when more
-    than one person shares this closet in the same session. When given, any item someone else is
-    currently wearing (update_wardrobe's worn_by, status "worn") is left out too, on top of the
-    laundry and exclude filters, since a shared physical item can't be worn by two people at once.
-    Omit for a single user; nothing changes for that case.
-    """
+def build_outfit(session, occasion: str = "class", must_include: list[str] | None = None, exclude: list[str] | None = None) -> str:
+    """Rank outfits from the closet against the most recent plan_day_warmth result."""
     plan = session.last_plan
     if not plan:
         return json.dumps({"error": "No day plan yet. Call plan_day_warmth with the user's schedule first."})
@@ -152,16 +144,8 @@ def build_outfit(session, occasion: str = "class", must_include: list[str] | Non
     if unknown:
         return json.dumps({"error": f"Unknown item ids {unknown}. Call list_wardrobe to see valid ids."})
 
-    def _claimed_by_someone_else(item: dict) -> bool:
-        if not for_whom or not item.get("worn_by"):
-            return False
-        return str(item["worn_by"]).strip().lower() != str(for_whom).strip().lower()
-
-    available = [i for i in session.wardrobe.values()
-                 if i["status"] != "in_laundry" and i["id"] not in exclude and not _claimed_by_someone_else(i)]
+    available = [i for i in session.wardrobe.values() if i["status"] != "in_laundry" and i["id"] not in exclude]
     laundry = [i["name"] for i in session.wardrobe.values() if i["status"] == "in_laundry"]
-    claimed = [i["name"] for i in session.wardrobe.values()
-               if i["status"] != "in_laundry" and _claimed_by_someone_else(i)]
     wearable = [i for i in available if slot(i) not in ("head", "hands", "neck")]
     accessories = [i for i in available if slot(i) in ("head", "hands", "neck")]
 
@@ -201,7 +185,6 @@ def build_outfit(session, occasion: str = "class", must_include: list[str] | Non
         "targets": {k: summary.get(k) for k in ("indoor_clo_min", "indoor_clo_ideal", "outdoor_clo_min", "outdoor_clo_ideal")},
         "options": options,
         "skipped_in_laundry": laundry,
-        "claimed_by_someone_else": claimed,
         "style_check": "on" if options[0]["style"] else "not built yet",
     })
 
@@ -210,24 +193,16 @@ def list_wardrobe(session, slot_filter: str | None = None) -> str:
     """Compact view of the closet so the model can refer to item ids."""
     items = [
         {"id": i["id"], "name": i["name"], "slot": slot(i), "clo": clo(i), "status": i["status"],
-         "wears": i["wears"], "wear_limit": wear_limit(i), "worn_by": i.get("worn_by")}
+         "wears": i["wears"], "wear_limit": wear_limit(i)}
         for i in session.wardrobe.values()
         if slot_filter in (None, slot(i))
     ]
     return json.dumps({"count": len(items), "items": items})
 
 
-def update_wardrobe(session, item_ids: list[str], status: str, worn_by: str | None = None) -> str:
+def update_wardrobe(session, item_ids: list[str], status: str) -> str:
     """Mark items clean, worn, or in the laundry. A 'worn' item that reaches its wear limit
-    (garments.csv, e.g. a t-shirt is 1, a coat is 10) goes to the laundry automatically.
-
-    worn_by optionally labels who is wearing the item today (e.g. "me" or a friend's name), for a
-    closet shared by more than one person. It only takes effect alongside status="worn", and only
-    on items that end up actually staying "worn" (not ones that hit their wear limit and go
-    straight to the laundry). Any other status clears the label: nobody currently "has" an item
-    once it isn't being worn right now. build_outfit's for_whom filter reads this label to avoid
-    handing one person's current pick to someone else before it is laundered.
-    """
+    (garments.csv, e.g. a t-shirt is 1, a coat is 10) goes to the laundry automatically."""
     if status not in STATUSES:
         return json.dumps({"error": f"status must be one of {STATUSES}."})
     unknown = [i for i in item_ids if i not in session.wardrobe]
@@ -248,10 +223,7 @@ def update_wardrobe(session, item_ids: list[str], status: str, worn_by: str | No
             item["status"] = "clean"
         else:
             item["status"] = status
-        item["worn_by"] = worn_by.strip()[:40] if (
-            isinstance(worn_by, str) and worn_by.strip() and item["status"] == "worn") else None
-        updated.append({"id": item_id, "name": item["name"], "status": item["status"], "wears": item["wears"],
-                         "worn_by": item["worn_by"]})
+        updated.append({"id": item_id, "name": item["name"], "status": item["status"], "wears": item["wears"]})
     result = {"updated": updated}
     if needs_laundry:
         result["note"] = f"{', '.join(needs_laundry)} hit the wear limit and went straight to the laundry."
@@ -269,8 +241,7 @@ TOOLS = [
                 "Pick the best outfits from the user's closet for the most recent plan_day_warmth result. "
                 "Skips items in the laundry, checks warmth indoors and outdoors, accounts for rain and wind, "
                 "and adds gloves/hat/scarf if needed. Returns up to 3 ranked options. "
-                "Always call plan_day_warmth first. For a shared closet, pass for_whom so one person's "
-                "current pick isn't offered to someone else."
+                "Always call plan_day_warmth first."
             ),
             "parameters": {
                 "type": "object",
@@ -280,10 +251,6 @@ TOOLS = [
                                      "description": "Item ids the user wants to wear, e.g. ['skirt-maxi']."},
                     "exclude": {"type": "array", "items": {"type": "string"},
                                 "description": "Item ids the user does not want today."},
-                    "for_whom": {"type": "string",
-                                 "description": "Who this outfit is for, e.g. 'me' or a name. Only needed when "
-                                                "more than one person shares this closet; items someone else is "
-                                                "currently wearing (see update_wardrobe) are left out."},
                 },
                 "required": [],
             },
@@ -318,9 +285,6 @@ TOOLS = [
                 "properties": {
                     "item_ids": {"type": "array", "items": {"type": "string"}, "description": "Item ids from list_wardrobe."},
                     "status": {"type": "string", "enum": STATUSES},
-                    "worn_by": {"type": "string",
-                                "description": "Who is wearing it today, e.g. 'me' or a name. Only needed when "
-                                               "more than one person shares this closet; omit for a single user."},
                 },
                 "required": ["item_ids", "status"],
             },

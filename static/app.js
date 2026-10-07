@@ -32,19 +32,13 @@ const PHRASES = ["walk to class.", "bus stop at 6pm.", "three-hour lecture.", "f
 
 // ---------- Small helpers ----------
 
-// "Start a session for someone else" opens /?fresh=1 in a new tab. A plain new tab would share
-// this origin's localStorage and so inherit the SAME session id, defeating the point; a tab
-// opened this way instead keeps its session id in sessionStorage, which is tab-scoped and never
-// touches (or is touched by) the original tab's localStorage entry.
-const sessionBackingStore = new URLSearchParams(location.search).has("fresh") ? sessionStorage : localStorage;
-
 function store(key, value) {
     try {
-        value === null ? sessionBackingStore.removeItem(key) : sessionBackingStore.setItem(key, value);
+        value === null ? localStorage.removeItem(key) : localStorage.setItem(key, value);
     } catch (e) { /* storage can be blocked; the page still works */ }
 }
 function load(key) {
-    try { return sessionBackingStore.getItem(key); } catch (e) { return null; }
+    try { return localStorage.getItem(key); } catch (e) { return null; }
 }
 
 function escapeHtml(text) {
@@ -379,10 +373,8 @@ function closetCell(item, selectedIds) {
     const btn = document.createElement("button");
     btn.className = `item ${item.status}${selectedIds.includes(item.id) ? " selected" : ""}${item.photo_url ? " has-photo" : ""}`;
     btn.dataset.id = item.id;
-    if (item.worn_by) btn.dataset.wornBy = item.worn_by;
     const wearNote = item.wear_limit ? ` · worn ${item.wears}/${item.wear_limit}` : "";
-    const wornByNote = item.worn_by ? ` · worn by ${item.worn_by} right now` : "";
-    btn.title = `${item.name}: ${item.status.replace("_", " ")}${wearNote}${wornByNote}. Tap to toggle laundry.`;
+    btn.title = `${item.name}: ${item.status.replace("_", " ")}${wearNote}. Tap to toggle laundry.`;
     const visual = item.photo_url ? `<img class="photo" src="${item.photo_url}" alt="" loading="lazy">` : garmentSvg(item);
     btn.innerHTML = `${visual}<div>${escapeHtml(item.name)}</div><span class="clo">${item.clo} clo</span>`;
     btn.addEventListener("click", () => toggleLaundry(item, btn));
@@ -641,9 +633,7 @@ function renderOutfit() {
     const byId = Object.fromEntries(closetItems.map((i) => [i.id, i]));
     const dateNote = lastOutfitDate ? `For ${lastOutfitDate}` : "";
     const laundryNote = lastOutfit.skipped_in_laundry.length ? `Skipped: ${lastOutfit.skipped_in_laundry.join(", ")}` : "";
-    const claimed = lastOutfit.claimed_by_someone_else || [];
-    const claimedNote = claimed.length ? `Claimed: ${claimed.join(", ")}` : "";
-    $("#outfit-meta").textContent = [dateNote, laundryNote, claimedNote].filter(Boolean).join(" · ");
+    $("#outfit-meta").textContent = [dateNote, laundryNote].filter(Boolean).join(" · ");
     el.innerHTML = `${lastOutfit.options.length > 1 ? carousel(lastOutfit.options, byId) : ""}<div id="option-detail"></div>`;
     el.querySelectorAll(".fc-card").forEach((card) => {
         card.addEventListener("click", () => focusCard(Number(card.dataset.i)));
