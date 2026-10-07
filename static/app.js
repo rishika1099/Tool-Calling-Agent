@@ -16,11 +16,14 @@ const A = !reduceMotion && window.anime?.animate ? window.anime : null;
 
 let sessionId = null;
 let pending = []; // uploaded photos not yet sent: {id, url}
-let lastOutfit = null; // latest build_outfit result
-let lastOutfitDate = null; // the plan_day_warmth date that outfit was built for, so the panel can say which day it's showing
+// Every build_outfit result seen this conversation, keyed by `${forWhom}||${day}` so the panel
+// can stack one card per day (and, once more than one person is in play, filter by person)
+// instead of only ever showing the most recent call.
+let outfitEntries = new Map(); // key -> { key, forWhom, day, outfit, optionIndex, shown }
+let activePerson = null; // whose day-stack "Your layers" shows, once more than one person is in play
+let focusedEntryKey = null; // which entry highlightCloset/#me-try act on: the most recently updated one
 let closetItems = [];
 let shownPlan = null; // what the panels last animated, so a refresh doesn't replay
-let shownOutfit = null;
 let closetShown = false;
 let catalog = null; // garment types and fibers for the Add clothes form
 let personPhotoId = null;
@@ -379,15 +382,19 @@ function closetCell(item, selectedIds) {
     const btn = document.createElement("button");
     btn.className = `item ${item.status}${selectedIds.includes(item.id) ? " selected" : ""}${item.photo_url ? " has-photo" : ""}`;
     btn.dataset.id = item.id;
-    if (item.worn_by) btn.dataset.wornBy = item.worn_by;
     const qty = item.qty ?? 1, dirty = item.qty_in_laundry ?? 0;
     const wearNote = item.wear_limit ? ` · worn ${item.wears}/${item.wear_limit}` : "";
     const wornByNote = item.worn_by ? ` · worn by ${item.worn_by} right now` : "";
+    const wornForNote = item.worn_for ? ` for ${item.worn_for}` : "";
     const tapNote = qty > 1 ? ` Tap to send 1 to the laundry.` : ` Tap to toggle laundry.`;
-    btn.title = `${item.name}: ${item.status.replace("_", " ")}${wearNote}${wornByNote}.${tapNote}`;
+    btn.title = `${item.name}: ${item.status.replace("_", " ")}${wearNote}${wornByNote}${wornForNote}.${tapNote}`;
     const visual = item.photo_url ? `<img class="photo" src="${item.photo_url}" alt="" loading="lazy">` : garmentSvg(item);
+    const tags = [];
+    if (item.worn_by) tags.push(`<span class="tag tag-person">${escapeHtml(item.worn_by)}</span>`);
+    if (item.worn_for) tags.push(`<span class="tag tag-day">${escapeHtml(item.worn_for)}</span>`);
+    const tagRow = tags.length ? `<div class="item-tags">${tags.join("")}</div>` : "";
     const qtyBadge = qty > 1 ? `<span class="qty-note">${qty - dirty}/${qty} avail${dirty ? ` · ${dirty} laundry` : ""}</span>` : "";
-    btn.innerHTML = `${visual}<div>${escapeHtml(item.name)}</div>${qtyBadge}<span class="clo">${item.clo} clo</span>`;
+    btn.innerHTML = `${tagRow}${visual}<div>${escapeHtml(item.name)}</div>${qtyBadge}<span class="clo">${item.clo} clo</span>`;
     btn.addEventListener("click", () => toggleLaundry(item, btn));
     attachSpotlight(btn, 14);
     cell.appendChild(btn);
@@ -576,7 +583,6 @@ function gauge(label, value, target, verdict) {
 // intro "rise", squeeze 0.2, gap 12, focusOnClick, captions). Each card's "image" is the
 // option's fabric stack in the clothes' real colors. The focused card drives the detail view.
 const CAROUSEL = { focusGrow: 2.6, squeeze: 0.2, rise: 36 };
-let optionIndex = 0;
 
 // Options usually share the coat, so lead with what differs: the dress, or top + bottom.
 function optionTitle(option) {
@@ -588,8 +594,12 @@ function optionSubtitle(option) {
     return `${outer ? `under the ${outer.toLowerCase()}` : "no coat"} · ${option.outdoor_clo} clo out`;
 }
 
-function carousel(options, byId) {
-    return `<div class="flex-carousel" role="group" aria-label="Outfit suggestions">${options.map((o, i) => {
+// One entry's carousel (its own build_outfit options, for one day and one person). Several of
+// these can be on screen stacked at once, one per day-section, so everything here is scoped to
+// the entry passed in rather than a single module-level "the" outfit.
+function carousel(entry) {
+    const byId = Object.fromEntries(closetItems.map((i) => [i.id, i]));
+    return `<div class="flex-carousel" role="group" aria-label="Outfit suggestions">${entry.outfit.options.map((o, i) => {
         const worn = o.items.filter((x) => STACK_ORDER.includes(x.slot))
             .sort((a, b) => STACK_ORDER.indexOf(a.slot) - STACK_ORDER.indexOf(b.slot));
         const stripes = worn.map((x) => `<i style="background:${byId[x.id]?.color || "#ccc"};flex:${(x.clo + 0.08).toFixed(2)}"></i>`).join("");
@@ -600,8 +610,8 @@ function carousel(options, byId) {
                 ? `<img src="${byId[x.id].photo_url}" alt="">`
                 : `<span style="background:${byId[x.id]?.color || "#ccc"}">${garmentSvg({ ...byId[x.id], slot: x.slot })}</span>`).join("")}</span>`
             : "";
-        return `<button class="fc-card${i === optionIndex ? " is-focus" : ""}" data-i="${i}" aria-pressed="${i === optionIndex}"
-                    style="flex-grow:${i === optionIndex ? CAROUSEL.focusGrow : 1}">
+        const on = i === entry.optionIndex;
+        return `<button class="fc-card${on ? " is-focus" : ""}" data-i="${i}" aria-pressed="${on}" style="flex-grow:${on ? CAROUSEL.focusGrow : 1}">
             ${collage || `<span class="fc-swatch" aria-hidden="true">${stripes}</span>`}
             <span class="fc-index">${String(i + 1).padStart(2, "0")}</span>
             <span class="fc-caption"><b>${escapeHtml(optionTitle(o))}</b><small>${escapeHtml(optionSubtitle(o))}</small></span>
@@ -609,10 +619,11 @@ function carousel(options, byId) {
     }).join("")}</div>`;
 }
 
-function focusCard(index) {
-    if (index === optionIndex) return;
-    optionIndex = index;
-    const cards = [...document.querySelectorAll("#outfit .fc-card")];
+function focusCard(entry, index, section) {
+    if (index === entry.optionIndex) return;
+    entry.optionIndex = index;
+    focusedEntryKey = entry.key;
+    const cards = [...section.querySelectorAll(".fc-card")];
     cards.forEach((c, i) => {
         const on = i === index;
         c.classList.toggle("is-focus", on);
@@ -622,19 +633,23 @@ function focusCard(index) {
         const spring = A.createSpring ? A.createSpring({ stiffness: 140, damping: 13 }) : "outElastic(1, .75)";
         safeAnimate(c, { flexGrow: on ? CAROUSEL.focusGrow : 1, scaleY: on ? 1 : 1 - CAROUSEL.squeeze * 0.25, ease: spring, duration: 900 });
     });
-    renderOptionDetail(true);
+    renderOptionDetail(entry, section, true);
     highlightCloset();
 }
 
+// Highlights the closet items for the entry most recently built or focused (not every stacked
+// entry at once: with several days/people on screen, highlighting all of them together would
+// just make the closet look selected everywhere and mean nothing).
 function highlightCloset() {
-    const ids = lastOutfit?.options?.[optionIndex]?.items.map((i) => i.id) || [];
+    const entry = outfitEntries.get(focusedEntryKey) || [...outfitEntries.values()][0];
+    const ids = entry?.outfit?.options?.[entry.optionIndex]?.items.map((i) => i.id) || [];
     document.querySelectorAll("#closet .item").forEach((el) => el.classList.toggle("selected", ids.includes(el.dataset.id)));
 }
 
-function renderOptionDetail(animate) {
-    const option = lastOutfit.options[optionIndex];
+function renderOptionDetail(entry, section, animate) {
+    const option = entry.outfit.options[entry.optionIndex];
     const byId = Object.fromEntries(closetItems.map((i) => [i.id, i]));
-    const t = lastOutfit.targets;
+    const t = entry.outfit.targets;
     const worn = option.items.filter((i) => STACK_ORDER.includes(i.slot))
         .sort((a, b) => STACK_ORDER.indexOf(a.slot) - STACK_ORDER.indexOf(b.slot));
     const extras = option.items.filter((i) => !STACK_ORDER.includes(i.slot));
@@ -645,7 +660,8 @@ function renderOptionDetail(animate) {
             ${thumb}${escapeHtml(i.name)}<span class="slot">${SLOT_LABEL[i.slot]}</span><small>${i.clo}</small></div>`;
     }).join("");
 
-    $("#option-detail").innerHTML = `
+    const detail = section.querySelector(".option-detail");
+    detail.innerHTML = `
         <div class="fit-grid">
             <div>
                 <div class="stack">${layers}</div>
@@ -661,44 +677,80 @@ function renderOptionDetail(animate) {
 
     if (animate && A) {
         // Get dressed from the inside out: base layer first, coat last.
-        safeAnimate("#option-detail .layer", { opacity: { from: 0 }, translateY: { from: -18 }, scaleX: { from: 0.92 },
+        safeAnimate(detail.querySelectorAll(".layer"), { opacity: { from: 0 }, translateY: { from: -18 }, scaleX: { from: 0.92 },
             duration: 700, delay: A.stagger(90, { from: "last" }), ease: "outBack(1.4)" });
-        safeAnimate("#option-detail .tube .fill", { scaleY: { from: 0 }, duration: 1200, delay: 200, ease: "outExpo" });
-        document.querySelectorAll("#option-detail .num").forEach(countUp);
-        enter("#option-detail .extras span, #option-detail .takeoff, #option-detail .notes li", { delay: 50, y: 8 });
+        safeAnimate(detail.querySelectorAll(".tube .fill"), { scaleY: { from: 0 }, duration: 1200, delay: 200, ease: "outExpo" });
+        detail.querySelectorAll(".num").forEach(countUp);
+        enter(detail.querySelectorAll(".extras span, .takeoff, .notes li"), { delay: 50, y: 8 });
     }
 }
 
+function dayLabel(day) {
+    return day ? `For ${day}` : "";
+}
+
+// The side panel: one stacked <section> per day this conversation has planned, in the exact
+// same carousel + detail style as before. Once more than one person is in play, a toggle filters
+// which person's day-stack is shown (each person keeps their own days and their own focused
+// option); with just one person and one day it renders exactly as it always did, just wrapped in
+// one inert section.
 function renderOutfit() {
     const el = $("#outfit");
-    if (!lastOutfit?.options?.length) {
+    if (!outfitEntries.size) {
         el.className = "empty";
         el.textContent = "Your outfit appears here as a stack of layers, next to how warm it keeps you.";
         $("#outfit-meta").textContent = "";
         return;
     }
-    const fresh = lastOutfit !== shownOutfit;
-    if (fresh) optionIndex = 0;
     el.className = "";
-    const byId = Object.fromEntries(closetItems.map((i) => [i.id, i]));
-    const dateNote = lastOutfitDate ? `For ${lastOutfitDate}` : "";
-    const laundryNote = lastOutfit.skipped_in_laundry.length ? `Skipped: ${lastOutfit.skipped_in_laundry.join(", ")}` : "";
-    const claimed = lastOutfit.claimed_by_someone_else || [];
-    const claimedNote = claimed.length ? `Claimed: ${claimed.join(", ")}` : "";
-    $("#outfit-meta").textContent = [dateNote, laundryNote, claimedNote].filter(Boolean).join(" · ");
-    el.innerHTML = `${lastOutfit.options.length > 1 ? carousel(lastOutfit.options, byId) : ""}<div id="option-detail"></div>`;
-    el.querySelectorAll(".fc-card").forEach((card) => {
-        card.addEventListener("click", () => focusCard(Number(card.dataset.i)));
-        attachSpotlight(card);
+    const people = [...new Set([...outfitEntries.values()].map((e) => e.forWhom))];
+    if (!people.includes(activePerson)) activePerson = people[0];
+    const shown = people.length > 1 ? [activePerson] : people;
+    const entries = [...outfitEntries.values()].filter((e) => shown.includes(e.forWhom)).sort((a, b) => a.day.localeCompare(b.day));
+
+    const toggle = people.length > 1
+        ? `<div class="person-toggle" role="tablist" aria-label="Whose layers to show">${people.map((p) =>
+            `<button type="button" role="tab" aria-selected="${p === activePerson}" data-person="${escapeHtml(p)}">${escapeHtml(p)}</button>`).join("")}</div>`
+        : "";
+
+    const metaParts = entries.flatMap((e) => {
+        const laundryNote = e.outfit.skipped_in_laundry.length ? `Skipped: ${e.outfit.skipped_in_laundry.join(", ")}` : "";
+        const claimed = e.outfit.claimed_by_someone_else || [];
+        const claimedNote = claimed.length ? `Claimed: ${claimed.join(", ")}` : "";
+        return [laundryNote, claimedNote].filter(Boolean);
     });
-    renderOptionDetail(fresh);
+    $("#outfit-meta").textContent = metaParts.join(" · ");
+
+    const stacked = entries.length > 1;
+    el.innerHTML = toggle + entries.map((e) => `
+        <section class="day-outfit" data-key="${escapeHtml(e.key)}">
+            ${stacked ? `<h4 class="day-outfit-head">${escapeHtml(dayLabel(e.day))}</h4>` : ""}
+            ${e.outfit.options.length > 1 ? carousel(e) : ""}
+            <div class="option-detail"></div>
+        </section>`).join("");
+
+    el.querySelectorAll(".person-toggle button").forEach((btn) => {
+        btn.addEventListener("click", () => { activePerson = btn.dataset.person; renderOutfit(); });
+    });
+
+    let anyFresh = false;
+    el.querySelectorAll(".day-outfit").forEach((section) => {
+        const entry = outfitEntries.get(section.dataset.key);
+        section.querySelectorAll(".fc-card").forEach((card) => {
+            card.addEventListener("click", () => focusCard(entry, Number(card.dataset.i), section));
+            attachSpotlight(card);
+        });
+        const fresh = !entry.shown;
+        if (fresh) anyFresh = true;
+        renderOptionDetail(entry, section, fresh);
+        entry.shown = true;
+    });
     highlightCloset();
     renderMe();
 
-    if (fresh) {
-        shownOutfit = lastOutfit;
+    if (anyFresh && A) {
         // "Rise" intro for the suggestions.
-        if (A) safeAnimate("#outfit .fc-card", { opacity: { from: 0 }, translateY: { from: CAROUSEL.rise }, duration: 900,
+        safeAnimate("#outfit .fc-card", { opacity: { from: 0 }, translateY: { from: CAROUSEL.rise }, duration: 900,
             delay: A.stagger(90), ease: "outExpo" });
     }
 }
@@ -808,8 +860,10 @@ async function sendMessage(text) {
         }
         const data = await res.json();
         sessionId = data.session_id;
-        // A single answer can plan more than one day (e.g. "today and tomorrow"); the panel can
-        // only show one, so pair the latest build_outfit with the plan_day_warmth that fed it.
+        // A single answer can plan more than one day, and more than one person, in one go (e.g.
+        // "today and tomorrow", or "for me and my roommate"). Pair each build_outfit with the
+        // plan_day_warmth that fed it (for its day) and its own for_whom (for its person), and
+        // keep every day/person combination seen this conversation, not just the latest.
         let planDate = null;
         for (const call of data.tool_calls) {
             if (call.name === "plan_day_warmth") {
@@ -818,7 +872,13 @@ async function sendMessage(text) {
             if (call.name !== "build_outfit") continue;
             try {
                 const parsed = JSON.parse(call.result);
-                if (parsed.options) { lastOutfit = parsed; lastOutfitDate = planDate; }
+                if (!parsed.options) continue;
+                const forWhom = call.args?.for_whom || "me";
+                const day = planDate || "today";
+                const key = `${forWhom}||${day}`;
+                outfitEntries.set(key, { key, forWhom, day, outfit: parsed, optionIndex: 0, shown: false });
+                focusedEntryKey = key;
+                activePerson = forWhom;
             } catch (e) { /* ignore */ }
         }
         loading.remove();
@@ -1065,7 +1125,7 @@ function renderMe() {
     box.classList.toggle("filled", !!personPhotoId);
     $("#me-clear").hidden = !personPhotoId;
     $("#me-sample").hidden = !!personPhotoId;
-    const hasOutfit = !!lastOutfit?.options?.length;
+    const hasOutfit = outfitEntries.size > 0;
     $("#me-try").hidden = !(personPhotoId && hasOutfit);
     $("#me-note").textContent = !personPhotoId
         ? "Add a full-body photo, facing the camera, to see outfits on you. It is sent to Google's image model to make the preview and kept only for this session."
@@ -1081,8 +1141,16 @@ function showPreview(url) {
 }
 
 $("#me-try").addEventListener("click", () => {
-    const n = optionIndex + 1;
-    sendMessage(lastOutfit.options.length > 1 ? `Show me wearing option ${n}.` : "Show me wearing this outfit.");
+    const entry = outfitEntries.get(focusedEntryKey) || [...outfitEntries.values()][0];
+    if (!entry) return;
+    const n = entry.optionIndex + 1;
+    const base = entry.outfit.options.length > 1 ? `Show me wearing option ${n}` : "Show me wearing this outfit";
+    // With more than one day/person planned, name which one explicitly: the model has more than a
+    // single outfit in history to disambiguate between once that's true.
+    const multiEntry = outfitEntries.size > 1;
+    const who = multiEntry && entry.forWhom && entry.forWhom.toLowerCase() !== "me" ? ` for ${entry.forWhom}` : "";
+    const when = multiEntry ? ` on ${entry.day}` : "";
+    sendMessage(`${base}${who}${when}.`);
 });
 
 async function setMe(imageId) {
@@ -1158,6 +1226,12 @@ $("#new-day").addEventListener("click", async () => {
     store("layerlab-session", null);
     try { sessionStorage.removeItem("layerlab-portal"); } catch (e) { /* fine */ }  // back to the window
     location.reload();
+});
+$("#new-person").addEventListener("click", (e) => {
+    // A real popup window, not a new tab in the same group: the other person's session
+    // should be visible side by side with this one, not just a tab away.
+    e.preventDefault();
+    window.open(e.currentTarget.href, "_blank", "noopener,width=480,height=860");
 });
 document.querySelectorAll(".spot").forEach((el) => attachSpotlight(el));
 window.addEventListener("resize", () => {

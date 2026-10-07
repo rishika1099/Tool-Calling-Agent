@@ -174,6 +174,7 @@ def add_item(session, fields: dict) -> dict:
         "status": "clean",
         "wears": 0,
         "worn_by": None,
+        "worn_for": None,
         "qty": 1,
         "qty_in_laundry": 0,
     }

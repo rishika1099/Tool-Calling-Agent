@@ -210,7 +210,7 @@ def list_wardrobe(session, slot_filter: str | None = None) -> str:
     """Compact view of the closet so the model can refer to item ids."""
     items = [
         {"id": i["id"], "name": i["name"], "slot": slot(i), "clo": clo(i), "status": i["status"],
-         "wears": i["wears"], "wear_limit": wear_limit(i), "worn_by": i.get("worn_by"),
+         "wears": i["wears"], "wear_limit": wear_limit(i), "worn_by": i.get("worn_by"), "worn_for": i.get("worn_for"),
          "qty": i.get("qty", 1), "qty_in_laundry": i.get("qty_in_laundry", 0)}
         for i in session.wardrobe.values()
         if slot_filter in (None, slot(i))
@@ -230,9 +230,11 @@ def sync_laundry_status(item: dict) -> None:
     item["status"] = "in_laundry" if dirty >= qty else "worn" if item["wears"] > 0 else "clean"
     if item["status"] != "worn":
         item["worn_by"] = None
+        item["worn_for"] = None
 
 
-def update_wardrobe(session, item_ids: list[str], status: str, worn_by: str | None = None) -> str:
+def update_wardrobe(session, item_ids: list[str], status: str, worn_by: str | None = None,
+                     worn_for: str | None = None) -> str:
     """Mark items clean, worn, or in the laundry. A 'worn' item that reaches its wear limit
     (garments.csv, e.g. a t-shirt is 1, a coat is 10) sends one unit to the laundry automatically;
     for an item owned more than once (qty > 1, set from the closet panel), only that one unit
@@ -242,11 +244,14 @@ def update_wardrobe(session, item_ids: list[str], status: str, worn_by: str | No
     closet panel's own laundry-count controls handle undoing a single accidental tap).
 
     worn_by optionally labels who is wearing the item today (e.g. "me" or a friend's name), for a
-    closet shared by more than one person. It only takes effect alongside status="worn", and only
-    on items that end up actually staying "worn" (not ones that hit their wear limit and go
-    straight to the laundry). Any other status clears the label: nobody currently "has" an item
-    once it isn't being worn right now. build_outfit's for_whom filter reads this label to avoid
-    handing one person's current pick to someone else before it is laundered.
+    closet shared by more than one person. worn_for optionally labels which day it's set aside for
+    (e.g. "today", "tomorrow", or the date used in plan_day_warmth) once more than one day has been
+    planned in this conversation, even for a single person. Both only take effect alongside
+    status="worn", and only on items that end up actually staying "worn" (not ones that hit their
+    wear limit and go straight to the laundry). Any other status clears both labels: nobody
+    currently "has" an item, for anyone or any day, once it isn't being worn right now.
+    build_outfit's for_whom filter reads worn_by to avoid handing one person's current pick to
+    someone else before it is laundered.
     """
     if status not in STATUSES:
         return json.dumps({"error": f"status must be one of {STATUSES}."})
@@ -268,10 +273,14 @@ def update_wardrobe(session, item_ids: list[str], status: str, worn_by: str | No
         else:  # "in_laundry": one more unit goes to the wash, same action as a laundry-panel tap
             item["qty_in_laundry"] = min(qty, item.get("qty_in_laundry", 0) + 1)
         sync_laundry_status(item)
+        still_worn = item["status"] == "worn"
         item["worn_by"] = worn_by.strip()[:40] if (
-            isinstance(worn_by, str) and worn_by.strip() and item["status"] == "worn") else None
+            isinstance(worn_by, str) and worn_by.strip() and still_worn) else None
+        item["worn_for"] = worn_for.strip()[:40] if (
+            isinstance(worn_for, str) and worn_for.strip() and still_worn) else None
         updated.append({"id": item_id, "name": item["name"], "status": item["status"], "wears": item["wears"],
-                         "worn_by": item["worn_by"], "qty": qty, "qty_in_laundry": item["qty_in_laundry"]})
+                         "worn_by": item["worn_by"], "worn_for": item["worn_for"],
+                         "qty": qty, "qty_in_laundry": item["qty_in_laundry"]})
     result = {"updated": updated}
     if needs_laundry:
         result["note"] = f"{', '.join(needs_laundry)} hit the wear limit and went straight to the laundry."
@@ -341,6 +350,10 @@ TOOLS = [
                     "worn_by": {"type": "string",
                                 "description": "Who is wearing it today, e.g. 'me' or a name. Only needed when "
                                                "more than one person shares this closet; omit for a single user."},
+                    "worn_for": {"type": "string",
+                                 "description": "Which day it's set aside for, e.g. 'today', 'tomorrow', or the "
+                                                "date used in plan_day_warmth. Only needed once more than one day "
+                                                "has been planned in this conversation, even for a single user."},
                 },
                 "required": ["item_ids", "status"],
             },

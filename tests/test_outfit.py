@@ -93,6 +93,25 @@ def test_list_wardrobe_reports_worn_by():
     assert items["jeans-indigo"]["worn_by"] == "Alex"
 
 
+def test_update_wardrobe_sets_and_clears_worn_for():
+    _, session = get_session(None)
+    result = json.loads(run_tool("update_wardrobe",
+                                  {"item_ids": ["jeans-indigo"], "status": "worn", "worn_for": "tomorrow"}, session))
+    assert session.wardrobe["jeans-indigo"]["worn_for"] == "tomorrow"
+    assert result["updated"][0]["worn_for"] == "tomorrow"
+    run_tool("update_wardrobe", {"item_ids": ["jeans-indigo"], "status": "clean"}, session)
+    assert session.wardrobe["jeans-indigo"]["worn_for"] is None
+
+
+def test_worn_for_does_not_gate_build_outfit_availability():
+    # worn_for is a display label only; it doesn't exclude the item for anyone, unlike worn_by.
+    _, session = get_session(None)
+    session.last_plan = SHARED_PLAN
+    run_tool("update_wardrobe", {"item_ids": ["jeans-indigo"], "status": "worn", "worn_for": "tomorrow"}, session)
+    result = json.loads(run_tool("build_outfit", {"must_include": ["jeans-indigo"]}, session))
+    assert "jeans-indigo" in {i["id"] for i in result["options"][0]["items"]}
+
+
 def test_qty_defaults_to_one_and_is_exposed():
     _, session = get_session(None)
     items = {i["id"]: i for i in json.loads(run_tool("list_wardrobe", {}, session))["items"]}
