@@ -16,6 +16,8 @@
     --warm: #f0a043;
     --hot: #e0572f;
     --ok: #2f8f5b;
+    --person-tag: #d6539a;
+    --day-tag: #8b5cf6;
     --radius: 22px;
     --display: "Fraunces", Georgia, serif;
     --text: "Inter", system-ui, sans-serif;
@@ -40,6 +42,8 @@
     --warm: #f3b163;
     --hot: #ff8a5c;
     --ok: #6fcf97;
+    --person-tag: #ff8fc4;
+    --day-tag: #b49cff;
     color-scheme: dark;
     background: #0b1424;
 }
@@ -354,6 +358,8 @@ body.in-setup #composer { display: none; }
     border-radius: 999px;
     font-size: 13px;
     font-weight: 500;
+    color: inherit;
+    text-decoration: none;
 }
 
 /* ---------- Layout + panels ---------- */
@@ -709,6 +715,27 @@ body.in-setup #composer { display: none; }
 .takeoff { margin-top: 14px; font-size: 13px; color: var(--muted); }
 .takeoff b { color: var(--ink); font-weight: 500; }
 
+/* Who "Your layers" is showing, once more than one person has planned an outfit this
+   conversation. Same pill-tab look as the closet's own section tabs, for one visual language. */
+.person-toggle { display: flex; gap: 6px; margin-bottom: 14px; }
+.person-toggle button {
+    flex: none;
+    border: 1px solid var(--line);
+    background: none;
+    color: var(--muted);
+    border-radius: 999px;
+    padding: 6px 13px;
+    font-size: 12px;
+    font-weight: 500;
+    transition: background 0.2s, color 0.2s, border-color 0.2s;
+}
+.person-toggle button:hover { color: var(--ink); }
+.person-toggle button[aria-selected="true"] { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); font-weight: 600; }
+
+/* One section per planned day; stacked with a divider once there's more than one. */
+.day-outfit + .day-outfit { margin-top: 22px; padding-top: 22px; border-top: 1px solid var(--line); }
+.day-outfit-head { font: 600 13px/1 var(--mono); color: var(--muted); text-transform: uppercase; letter-spacing: 0.04em; margin-bottom: 12px; }
+
 /* Flex carousel of outfit suggestions (after reactbits' FlexCarousel, "liquid" preset). */
 .flex-carousel { display: flex; gap: 12px; height: 156px; margin-bottom: 18px; }
 .fc-card {
@@ -817,20 +844,25 @@ body.in-setup #composer { display: none; }
     color: var(--accent-ink);
 }
 .item.selected { border-color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); }
-/* A shared-closet item someone else currently has on: same ribbon as "in laundry", different
-   color so the two are easy to tell apart (they're mutually exclusive in practice). */
-.item[data-worn-by]::after {
-    content: attr(data-worn-by);
-    position: absolute;
-    top: 8px;
-    right: -28px;
-    transform: rotate(35deg);
-    padding: 2px 28px;
-    font: 500 8px/1.4 var(--mono);
+
+/* A shared-closet item someone currently has on (pink), and which day it's set aside for
+   (purple). Real chips, not a ribbon: up to two can coexist, which a single ::after corner
+   can't do cleanly. */
+.item-tags { position: absolute; top: 6px; left: 6px; right: 6px; display: flex; flex-wrap: wrap; gap: 3px; z-index: 1; }
+.tag {
+    font: 600 8px/1.4 var(--mono);
     text-transform: uppercase;
-    background: var(--ok);
-    color: #ffffff;
+    letter-spacing: 0.04em;
+    padding: 2px 6px;
+    border-radius: 999px;
+    color: #fff;
+    white-space: nowrap;
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
+.tag-person { background: var(--person-tag); }
+.tag-day { background: var(--day-tag); }
 
 /* ---------- Add clothes ---------- */
 

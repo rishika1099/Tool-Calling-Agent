@@ -156,7 +156,10 @@ TOOLS = [
                 "Generate a picture of the user wearing an outfit, from their saved full-body photo. Use when they "
                 "ask to see it on them ('show me wearing it', 'how would option 2 look on me?'). Takes about 15 "
                 "seconds, so only call it when asked. With no item_ids it shows the outfit build_outfit just "
-                "picked; for 'option 2' pass that option's item ids from the build_outfit result."
+                "picked; for 'option 2' pass that option's item ids from the build_outfit result. If more than one "
+                "day and/or person has been planned in this conversation, match item_ids to the specific "
+                "build_outfit call the request names (e.g. 'option 2 for tomorrow', 'Alex's outfit'), not just the "
+                "most recent one."
             ),
             "parameters": {
                 "type": "object",
