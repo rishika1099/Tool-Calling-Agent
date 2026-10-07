@@ -956,7 +956,11 @@ body.in-setup #composer { display: none; }
 .adder-actions .primary { margin-left: 0; }
 
 .item-cell { position: relative; }
-.item-cell .item { width: 100%; }
+/* .closet-grid stretches every cell in a row to match its tallest neighbor (grid default
+   align-items: stretch); without height:100% here, .item stays its own shorter height while
+   .item-cell grows, leaving empty space below it that the qty stepper/undo/remove buttons
+   (anchored to .item-cell, not .item) could drift into, outside the visible tile. */
+.item-cell .item { width: 100%; height: 100%; }
 .item-cell .rm { opacity: 0; transition: opacity 0.2s; z-index: 2; }
 .item-cell:hover .rm, .item-cell .rm:focus-visible { opacity: 1; }
 .item img.photo { width: 100%; aspect-ratio: 1; object-fit: cover; background: #f1ece3; border-radius: 9px; display: block; margin-bottom: 6px; }
